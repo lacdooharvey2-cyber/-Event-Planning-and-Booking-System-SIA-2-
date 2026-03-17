@@ -1,0 +1,197 @@
+'use client'
+
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { BarChart3, Users, Building2, CreditCard, TrendingUp, AlertCircle } from 'lucide-react'
+import { useEffect } from 'react'
+
+export default function AdminPage() {
+  const router = useRouter()
+  const { user, isLoggedIn } = useAuth()
+
+  useEffect(() => {
+    if (!isLoggedIn || user?.role !== 'admin') {
+      router.push('/')
+    }
+  }, [isLoggedIn, user, router])
+
+  if (!isLoggedIn || user?.role !== 'admin') {
+    return null
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto max-w-7xl px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <p className="text-muted-foreground mt-2">Manage EventHub platform and users</p>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <Card className="p-6">
+            <div className="flex items-start justify-between mb-2">
+              <h3 className="text-sm font-medium text-muted-foreground">Total Users</h3>
+              <Users className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="text-2xl font-bold">1,234</div>
+            <p className="text-xs text-green-600 mt-2">+12% from last month</p>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-start justify-between mb-2">
+              <h3 className="text-sm font-medium text-muted-foreground">Total Venues</h3>
+              <Building2 className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="text-2xl font-bold">156</div>
+            <p className="text-xs text-green-600 mt-2">+8% from last month</p>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-start justify-between mb-2">
+              <h3 className="text-sm font-medium text-muted-foreground">Total Bookings</h3>
+              <CreditCard className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="text-2xl font-bold">892</div>
+            <p className="text-xs text-green-600 mt-2">+24% from last month</p>
+          </Card>
+
+          <Card className="p-6">
+            <div className="flex items-start justify-between mb-2">
+              <h3 className="text-sm font-medium text-muted-foreground">Revenue</h3>
+              <TrendingUp className="h-4 w-4 text-blue-600" />
+            </div>
+            <div className="text-2xl font-bold">₱2.5M</div>
+            <p className="text-xs text-green-600 mt-2">+18% from last month</p>
+          </Card>
+        </div>
+
+        {/* Management Sections */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Users Management */}
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4">User Management</h2>
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between items-center p-3 bg-muted rounded">
+                <span className="text-sm">Total Customers</span>
+                <span className="font-semibold">945</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-muted rounded">
+                <span className="text-sm">Venue Owners</span>
+                <span className="font-semibold">156</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-muted rounded">
+                <span className="text-sm">Admins</span>
+                <span className="font-semibold">3</span>
+              </div>
+            </div>
+            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" asChild>
+              <Link href="/admin/users">Manage Users</Link>
+            </Button>
+          </Card>
+
+          {/* Venues Management */}
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4">Venues Management</h2>
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between items-center p-3 bg-muted rounded">
+                <span className="text-sm">Active Venues</span>
+                <span className="font-semibold">156</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-muted rounded">
+                <span className="text-sm">Pending Approval</span>
+                <Badge className="bg-yellow-600 text-white">12</Badge>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-muted rounded">
+                <span className="text-sm">Reported Issues</span>
+                <Badge className="bg-red-600 text-white">3</Badge>
+              </div>
+            </div>
+            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" asChild>
+              <Link href="/admin/venues">Manage Venues</Link>
+            </Button>
+          </Card>
+
+          {/* Services Management */}
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4">Services Management</h2>
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between items-center p-3 bg-muted rounded">
+                <span className="text-sm">Total Services</span>
+                <span className="font-semibold">342</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-muted rounded">
+                <span className="text-sm">Service Providers</span>
+                <span className="font-semibold">89</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-muted rounded">
+                <span className="text-sm">Inactive Services</span>
+                <span className="font-semibold">12</span>
+              </div>
+            </div>
+            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" asChild>
+              <Link href="/admin/services">Manage Services</Link>
+            </Button>
+          </Card>
+
+          {/* Reports & Analytics */}
+          <Card className="p-6">
+            <h2 className="text-xl font-semibold mb-4">Reports & Analytics</h2>
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between items-center p-3 bg-muted rounded">
+                <span className="text-sm">This Month's Bookings</span>
+                <span className="font-semibold">234</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-muted rounded">
+                <span className="text-sm">This Month's Revenue</span>
+                <span className="font-semibold">₱845K</span>
+              </div>
+              <div className="flex justify-between items-center p-3 bg-muted rounded">
+                <span className="text-sm">Avg. Booking Value</span>
+                <span className="font-semibold">₱61K</span>
+              </div>
+            </div>
+            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" asChild>
+              <Link href="/admin/reports">View Reports</Link>
+            </Button>
+          </Card>
+        </div>
+
+        {/* Recent Issues */}
+        <Card className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertCircle className="h-5 w-5 text-red-600" />
+            <h2 className="text-xl font-semibold">Recent Issues & Reports</h2>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-start justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div>
+                <p className="font-medium">Venue not responding to inquiries</p>
+                <p className="text-sm text-muted-foreground">Glass Garden Hall - reported 2 hours ago</p>
+              </div>
+              <Badge className="bg-red-600">High</Badge>
+            </div>
+            <div className="flex items-start justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div>
+                <p className="font-medium">Service provider contact invalid</p>
+                <p className="text-sm text-muted-foreground">DJ & Sound System - reported 1 day ago</p>
+              </div>
+              <Badge className="bg-yellow-600">Medium</Badge>
+            </div>
+            <div className="flex items-start justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <div>
+                <p className="font-medium">Payment declined - refund pending</p>
+                <p className="text-sm text-muted-foreground">Booking #ABC123 - reported 3 days ago</p>
+              </div>
+              <Badge className="bg-yellow-600">Medium</Badge>
+            </div>
+          </div>
+        </Card>
+      </div>
+    </div>
+  )
+}

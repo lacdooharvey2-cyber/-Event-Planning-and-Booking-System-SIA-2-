@@ -211,6 +211,7 @@ export default function CheckoutPage() {
                   </div>
 
                   <div>
+                    {/* for customer na meron nang venue for event and ang inavail lang ay services */}
                     <Label htmlFor="address">Event Address</Label>
                     <Input
                       id="address"

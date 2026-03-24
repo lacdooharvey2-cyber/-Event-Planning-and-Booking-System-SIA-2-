@@ -33,49 +33,49 @@ export default function VenuesPage() {
           <p className="text-muted-foreground">Find the perfect venue for your event</p>
         </div>
 
-        {/* Filters */}
-        <Card className="p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Search Venues</label>
-              <div className="flex items-center border border-input rounded-lg px-3">
-                <Search className="h-4 w-4 text-muted-foreground mr-2" />
-                <Input
-                  type="text"
-                  placeholder="Search by name..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="border-0 outline-none"
-                />
-              </div>
-            </div>
+        {/* Filters */}
+        <Card className="p-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Search Venues</label>
+              <div className="flex items-center border border-input rounded-lg px-3">
+                <Search className="h-4 w-4 text-muted-foreground mr-2" />
+                <Input
+                  type="text"
+                  placeholder="Search by name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="border-0 outline-none"
+                />
+              </div>
+            </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">Category</label>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-input rounded-lg bg-background"
-              >
-                {categories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Category</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full px-3 py-2 border border-input rounded-lg bg-background"
+              >
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">Location</label>
-              <select
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-                className="w-full px-3 py-2 border border-input rounded-lg bg-background"
-              >
-                {locations.map(loc => (
-                  <option key={loc} value={loc}>{loc}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Location</label>
+              <select
+                value={selectedLocation}
+                onChange={(e) => setSelectedLocation(e.target.value)}
+                className="w-full px-3 py-2 border border-input rounded-lg bg-background"
+              >
+                {locations.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
+            </div>
+          </div>
 
           <div className="flex flex-wrap gap-2 items-center pt-4 border-t border-border">
             <Sparkles className="h-4 w-4 text-muted-foreground" />

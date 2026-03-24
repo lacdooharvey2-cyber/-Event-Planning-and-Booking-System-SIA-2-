@@ -16,7 +16,9 @@ export default function SignUp() {
   const router = useRouter()
   const { signup } = useAuth()
   const [formData, setFormData] = useState({
-    name: '',
+    firstname: '',
+    middlename: '',
+    lastname: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -41,7 +43,8 @@ export default function SignUp() {
 
     setIsLoading(true)
     try {
-      await signup(formData.email, formData.password, formData.name, formData.role as any)
+      const fullName = `${formData.firstname} ${formData.middlename} ${formData.lastname}`
+await signup(formData.email, formData.password, fullName, formData.role as any)
       router.push('/venues')
     } catch {
       setError('Failed to create account')
@@ -68,17 +71,36 @@ export default function SignUp() {
             )}
 
             <div>
-              <Label htmlFor="name">Full Name</Label>
+              <Label>First Name</Label>
               <Input
-                id="name"
                 type="text"
-                placeholder="John Doe"
+                placeholder="John"
                 required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                value={formData.firstname}
+                onChange={(e) => setFormData({ ...formData, firstname: e.target.value })}
               />
             </div>
 
+            <div>
+              <Label>Middle Name</Label>
+              <Input
+                type="text"
+                placeholder="(Optional)"
+                value={formData.middlename}
+                onChange={(e) => setFormData({ ...formData, middlename: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <Label>Last Name</Label>
+              <Input
+                type="text"
+                placeholder="Doe"
+                required
+                value={formData.lastname}
+                onChange={(e) => setFormData({ ...formData, lastname: e.target.value })}
+              />
+            </div>
             <div>
               <Label htmlFor="email">Email Address</Label>
               <Input

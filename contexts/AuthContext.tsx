@@ -46,15 +46,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true)
     await new Promise(resolve => setTimeout(resolve, 500))
 
-    // Fixed accounts per role (use these to log in; no signup needed)
+    const normalizedEmail = email.trim().toLowerCase()
+
+    // Fixed accounts per role (use these to log in; no signup needed). Keys must be lowercase.
     const accounts: Record<string, { password: string; id: string; name: string; role: UserRole }> = {
       'client@evora.com': { password: 'client123', id: 'user-client', name: 'Client User', role: 'customer' },
       'venue@evora.com': { password: 'venue123', id: 'user-venue', name: 'Venue Manager', role: 'venue_owner' },
       'provider@evora.com': { password: 'provider123', id: 'user-provider', name: 'Service Provider', role: 'service_provider' },
       'admin@evora.com': { password: 'admin123', id: 'user-admin', name: 'Admin', role: 'admin' },
+      'lacdooharvey2@gmail.com': {
+        password: 'LacdooHarvey-Evora2026!',
+        id: 'user-admin-lacdooharvey',
+        name: 'Harvey Lacdoo',
+        role: 'admin',
+      },
     }
 
-    const account = accounts[email]
+    const account = accounts[normalizedEmail]
     if (!account || account.password !== password) {
       setIsLoading(false)
       throw new Error('Invalid email or password')
@@ -62,7 +70,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const userData: User = {
       id: account.id,
-      email,
+      email: normalizedEmail,
       name: account.name,
       role: account.role,
       phone: '09123456789',

@@ -4,7 +4,10 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { useApp } from '@/contexts/AppContext'
+import { cartLineKey, useApp } from '@/contexts/AppContext'
+import { requestEmailReceipt } from '@/lib/request-email-receipt'
+import { persistOrderRemote } from '@/lib/persist-order'
+import type { Booking } from '@/lib/storage'
 import { useAuth } from '@/contexts/AuthContext'
 import { Trash2, ArrowLeft } from 'lucide-react'
 
@@ -28,7 +31,7 @@ export default function CartPage() {
     const eventDate = cart[0]?.date ?? nowIso.slice(0, 10)
     const guestCount = cart.reduce((sum, item) => sum + item.quantity, 0)
 
-    const booking = {
+    const booking: Booking = {
       id: newBookingId,
       userId: user!.id,
       items: cart.map(item => ({
@@ -37,9 +40,10 @@ export default function CartPage() {
         name: item.name,
         price: item.price,
         quantity: item.quantity,
+        date: item.date,
       })),
       totalAmount: total,
-      status: 'confirmed' as const,
+      status: 'pending',
       eventDate,
       guestCount,
       location: 'N/A',
@@ -59,7 +63,9 @@ export default function CartPage() {
     }
 
     addBooking(booking)
+    persistOrderRemote(booking)
     clearCart()
+    void requestEmailReceipt(booking.customerInfo.email, booking)
     router.push(`/bookings/${booking.id}`)
   }
 
@@ -81,7 +87,7 @@ export default function CartPage() {
             {cart.length > 0 ? (
               <div className="space-y-4">
                 {cart.map(item => (
-                  <Card key={item.id} className="p-4 flex items-start justify-between">
+                  <Card key={cartLineKey(item)} className="p-4 flex items-start justify-between">
                     <div className="flex-1">
                       <h3 className="font-semibold text-lg">{item.name}</h3>
                       <p className="text-sm text-muted-foreground">
@@ -95,7 +101,7 @@ export default function CartPage() {
                       </p>
                     </div>
                     <button
-                      onClick={() => removeFromCart(item.id)}
+                      onClick={() => removeFromCart(item.id, item.date)}
                       className="p-2 hover:bg-red-50 rounded-lg transition-colors"
                     >
                       <Trash2 className="h-5 w-5 text-red-600" />

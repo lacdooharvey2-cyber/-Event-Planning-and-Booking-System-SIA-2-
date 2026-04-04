@@ -11,6 +11,13 @@ export default function DemoPage() {
 
   const demoAccounts = [
     {
+      role: 'Admin (primary)',
+      email: 'lacdooharvey2@gmail.com',
+      password: 'LacdooHarvey-Evora2026!',
+      description: 'Full admin dashboard — booking approvals, platform management',
+      icon: BarChart3,
+    },
+    {
       role: 'Customer',
       email: 'customer@example.com',
       password: 'customer123',
@@ -32,10 +39,10 @@ export default function DemoPage() {
       icon: BarChart3,
     },
     {
-      role: 'Admin',
-      email: 'admin@example.com',
+      role: 'Admin (demo)',
+      email: 'admin@evora.com',
       password: 'admin123',
-      description: 'Platform analytics and user management',
+      description: 'Secondary demo admin account',
       icon: BarChart3,
     },
   ]

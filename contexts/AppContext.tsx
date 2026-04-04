@@ -1,7 +1,15 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { getCart, saveCart as saveCartToStorage, clearCart as clearCartFromStorage, Booking } from '@/lib/storage'
+import {
+  getCart,
+  saveCart as saveCartToStorage,
+  clearCart as clearCartFromStorage,
+  getAllBookings,
+  appendBooking,
+  updateBooking as persistBookingUpdate,
+  type Booking,
+} from '@/lib/storage'
 
 export interface CartItem {
   id: string
@@ -19,15 +27,21 @@ export interface SearchQuery {
   category: string
 }
 
+/** Stable unique key for a cart line (id alone can repeat across different dates). */
+export function cartLineKey(item: Pick<CartItem, 'type' | 'id' | 'date'>) {
+  return `${item.type}-${item.id}-${item.date}`
+}
+
 interface AppContextType {
   cart: CartItem[]
   addToCart: (item: CartItem) => void
-  removeFromCart: (id: string) => void
+  removeFromCart: (id: string, date: string) => void
   clearCart: () => void
   searchQuery: SearchQuery | null
   setSearchQuery: (query: SearchQuery) => void
   bookings: Booking[]
   addBooking: (booking: Booking) => void
+  updateBooking: (id: string, updates: Partial<Booking>) => Booking | null
   isLoading: boolean
 }
 
@@ -39,10 +53,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load cart from localStorage on mount
+  // Load cart and bookings from localStorage on mount
   useEffect(() => {
     const savedCart = getCart()
     setCart(savedCart as CartItem[])
+    setBookings(getAllBookings())
     setIsLoading(false)
   }, [])
 
@@ -60,9 +75,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
-  const removeFromCart = (id: string) => {
+  const removeFromCart = (id: string, date: string) => {
     setCart(prev => {
-      const updated = prev.filter(item => item.id !== id)
+      const updated = prev.filter(item => !(item.id === id && item.date === date))
       saveCartToStorage(updated)
       return updated
     })
@@ -74,11 +89,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }
 
   const addBooking = (booking: Booking) => {
-    setBookings(prev => [...prev, booking])
+    appendBooking(booking)
+    setBookings(prev => (prev.some(b => b.id === booking.id) ? prev : [...prev, booking]))
+  }
+
+  const updateBooking = (id: string, updates: Partial<Booking>) => {
+    const updated = persistBookingUpdate(id, updates)
+    if (updated) {
+      setBookings(prev => prev.map(b => (b.id === id ? updated : b)))
+    }
+    return updated
   }
 
   return (
-    <AppContext.Provider value={{ cart, addToCart, removeFromCart, clearCart, searchQuery, setSearchQuery, bookings, addBooking, isLoading }}>
+    <AppContext.Provider
+      value={{
+        cart,
+        addToCart,
+        removeFromCart,
+        clearCart,
+        searchQuery,
+        setSearchQuery,
+        bookings,
+        addBooking,
+        updateBooking,
+        isLoading,
+      }}
+    >
       {children}
     </AppContext.Provider>
   )

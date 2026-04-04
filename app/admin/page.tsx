@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useApp } from '@/contexts/AppContext'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +13,8 @@ import { useEffect } from 'react'
 export default function AdminPage() {
   const router = useRouter()
   const { user, isLoggedIn } = useAuth()
+  const { bookings, updateBooking } = useApp()
+  const pendingBookings = bookings.filter(b => b.status === 'pending')
 
   useEffect(() => {
     if (!isLoggedIn || user?.role !== 'admin') {
@@ -160,6 +163,54 @@ export default function AdminPage() {
             </Button>
           </Card>
         </div>
+
+        {/* Pending booking confirmations */}
+        <Card className="p-6 mb-8">
+          <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+            <div>
+              <h2 className="text-xl font-semibold">Bookings awaiting confirmation</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                New checkouts stay pending until you confirm them. Customers receive a receipt by email; status becomes
+                confirmed only after you approve.
+              </p>
+            </div>
+            <Badge className="bg-yellow-600 text-white shrink-0">{pendingBookings.length} pending</Badge>
+          </div>
+          {pendingBookings.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No bookings waiting for admin confirmation.</p>
+          ) : (
+            <ul className="space-y-3">
+              {pendingBookings.map(b => (
+                <li
+                  key={b.id}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border border-border rounded-lg bg-muted/30"
+                >
+                  <div className="space-y-1">
+                    <p className="font-mono text-sm font-semibold">#{b.id}</p>
+                    <p className="text-sm">
+                      {b.customerInfo.name} · {b.customerInfo.email}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Event {b.eventDate} · ₱{b.totalAmount.toLocaleString()} · {b.guestCount} guests
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/bookings/${b.id}`}>View</Link>
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => updateBooking(b.id, { status: 'confirmed' })}
+                    >
+                      Confirm booking
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
 
         {/* Recent Issues */}
         <Card className="p-6">

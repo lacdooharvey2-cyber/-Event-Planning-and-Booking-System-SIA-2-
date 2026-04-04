@@ -1,29 +1,36 @@
 'use client'
 
-import React from "react"
-
+import React, { useEffect, useRef, useState } from "react"
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { useApp } from '@/contexts/AppContext'
+import { cartLineKey, useApp } from '@/contexts/AppContext'
 import { useAuth } from '@/contexts/AuthContext'
-import { ArrowLeft, Lock, CheckCircle2, Smartphone, CreditCard } from 'lucide-react'
-import { useState } from 'react'
+import { requestEmailReceipt } from '@/lib/request-email-receipt'
+import { persistOrderRemote } from '@/lib/persist-order'
+import type { Booking } from '@/lib/storage'
+import { ArrowLeft, Lock, CheckCircle2, Smartphone, CreditCard, FileText } from 'lucide-react'
 
 export default function CheckoutPage() {
-  const router = useRouter()
   const { cart, clearCart, addBooking } = useApp()
   const { isLoggedIn, user } = useAuth()
-  const [step, setStep] = useState<'info' | 'payment' | 'success'>('info')
+
+  // ✅ keep hooks at the top level
+  const [step, setStep] = useState<'info' | 'payment' | 'confirm' | 'success'>('info')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [agreeCancellation, setAgreeCancellation] = useState(false)
+  const [completedTotal, setCompletedTotal] = useState<number | null>(null)
+  const [completedBooking, setCompletedBooking] = useState<Booking | null>(null)
+  const [receiptNotice, setReceiptNotice] = useState<string | null>(null)
+  const [receiptMailtoUrl, setReceiptMailtoUrl] = useState<string | null>(null)
+  const receiptSentForBookingId = useRef<string | null>(null)
   const [formData, setFormData] = useState({
-    fullName: user?.name || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    address: user?.address || '',
+    fullName: user?.name ?? '',
+    email: user?.email ?? '',
+    phone: user?.phone ?? '',
+    address: user?.address ?? '',
   })
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'gcash' | 'paymaya'>('card')
   const [paymentData, setPaymentData] = useState({
@@ -37,6 +44,7 @@ export default function CheckoutPage() {
   const [bookingId, setBookingId] = useState('')
   const [agreeTerms, setAgreeTerms] = useState(false)
 
+  // ...rest of your component logic
   if (!isLoggedIn) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
@@ -54,7 +62,7 @@ export default function CheckoutPage() {
     )
   }
 
-  if (cart.length === 0) {
+  if (cart.length === 0 && step !== 'success') {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <Card className="p-8 max-w-md text-center">
@@ -71,6 +79,30 @@ export default function CheckoutPage() {
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const total = subtotal
 
+  useEffect(() => {
+    if (step !== 'success' || !completedBooking) return
+    if (receiptSentForBookingId.current === completedBooking.id) return
+    receiptSentForBookingId.current = completedBooking.id
+    setReceiptNotice(null)
+    setReceiptMailtoUrl(null)
+
+    void (async () => {
+      const result = await requestEmailReceipt(completedBooking.customerInfo.email, completedBooking)
+      if ('sent' in result && result.sent) {
+        setReceiptNotice(`A receipt has been sent to ${completedBooking.customerInfo.email}.`)
+        return
+      }
+      if ('mailtoUrl' in result) {
+        setReceiptNotice(
+          'Automatic email is not configured. Use the button below to open your email app with the receipt filled in.'
+        )
+        setReceiptMailtoUrl(result.mailtoUrl)
+        return
+      }
+      setReceiptNotice('Receipt could not be sent. You can email it from your booking details page.')
+    })()
+  }, [step, completedBooking])
+
   const handleInfoSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (formData.fullName && formData.email && formData.phone) {
@@ -78,9 +110,9 @@ export default function CheckoutPage() {
     }
   }
 
-  const handlePaymentSubmit = async (e: React.FormEvent) => {
+  const handlePaymentSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!agreeTerms) {
       alert('Please agree to the Terms and Conditions and Privacy Policy to proceed.')
       return
@@ -102,61 +134,71 @@ export default function CheckoutPage() {
     }
 
     if (isValid) {
-      setIsProcessing(true)
-
-      // Simulate payment processing
-      setTimeout(() => {
-        const newBookingId = Math.random().toString(36).substring(2, 11)
-        setBookingId(newBookingId)
-        const [paidTotal, setPaidTotal] = useState(0);
-
-        const methodLabel =
-          paymentMethod === 'card' ? 'Credit/Debit Card' : paymentMethod === 'gcash' ? 'GCash' : 'PayMaya'
-
-        const nowIso = new Date().toISOString()
-        const eventDate = cart[0]?.date ?? nowIso.slice(0, 10)
-        const guestCount = cart.reduce((sum, item) => sum + item.quantity, 0)
-
-        const booking = {
-          id: newBookingId,
-          userId: user!.id,
-          items: cart.map(item => ({
-            id: item.id,
-            type: item.type,
-            name: item.name,
-            price: item.price,
-            quantity: item.quantity,
-            date: item.date,
-          })),
-          totalAmount: total,
-          status: 'confirmed' as const,
-          eventDate,
-          guestCount,
-          location: formData.address || 'N/A',
-          customerInfo: {
-            name: formData.fullName,
-            email: formData.email,
-            phone: formData.phone,
-          },
-          paymentInfo: {
-            method: methodLabel,
-            cardLast4: paymentMethod === 'card' ? paymentData.cardNumber.slice(-4) || '0000' : 'N/A',
-            transactionId: newBookingId,
-            paidAt: nowIso,
-          },
-          createdAt: nowIso,
-          updatedAt: nowIso,
-        }
-
-        addBooking(booking)
-        setPaidTotal(total)
-        clearCart()
-        setIsProcessing(false)
-        setStep('success')
-      }, 2000)
+      setAgreeCancellation(false)
+      setStep('confirm')
     } else {
       alert('Please complete all required payment details before proceeding.')
     }
+  }
+
+  const handleConfirmPayment = () => {
+    if (!agreeCancellation) {
+      alert('Please read and accept the cancellation agreement before continuing.')
+      return
+    }
+
+    setIsProcessing(true)
+
+    setTimeout(() => {
+      const newBookingId = Math.random().toString(36).substring(2, 11)
+      setBookingId(newBookingId)
+
+      const methodLabel =
+        paymentMethod === 'card' ? 'Credit/Debit Card' : paymentMethod === 'gcash' ? 'GCash' : 'PayMaya'
+
+      const nowIso = new Date().toISOString()
+      const eventDate = cart[0]?.date ?? nowIso.slice(0, 10)
+      const guestCount = cart.reduce((sum, item) => sum + item.quantity, 0)
+
+      const booking: Booking = {
+        id: newBookingId,
+        userId: user!.id,
+        items: cart.map(item => ({
+          id: item.id,
+          type: item.type,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+          date: item.date,
+        })),
+        totalAmount: total,
+        status: 'pending',
+        eventDate,
+        guestCount,
+        location: formData.address || 'N/A',
+        customerInfo: {
+          name: formData.fullName,
+          email: formData.email,
+          phone: formData.phone,
+        },
+        paymentInfo: {
+          method: methodLabel,
+          cardLast4: paymentMethod === 'card' ? paymentData.cardNumber.slice(-4) || '0000' : 'N/A',
+          transactionId: newBookingId,
+          paidAt: nowIso,
+        },
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      }
+
+      setCompletedBooking(booking)
+      addBooking(booking)
+      persistOrderRemote(booking)
+      setCompletedTotal(total)
+      clearCart()
+      setIsProcessing(false)
+      setStep('success')
+    }, 2000)
   }
 
   return (
@@ -470,14 +512,152 @@ export default function CheckoutPage() {
                   </div>
 
                   <div className="flex gap-3">
-                    <Button variant="outline" className="flex-1 bg-transparent" onClick={() => setStep('info')}>
+                    <Button type="button" variant="outline" className="flex-1 bg-transparent" onClick={() => setStep('info')}>
                       Back
                     </Button>
-                    <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed" disabled={isProcessing || !agreeTerms}>
-                      {isProcessing ? 'Processing Payment...' : 'Pay Now'}
+                    <Button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed" disabled={!agreeTerms}>
+                      Pay Now
                     </Button>
                   </div>
                 </form>
+              </Card>
+            )}
+
+            {/* Step 3: Confirm payment + cancellation contract */}
+            {step === 'confirm' && (
+              <Card className="p-6">
+                <div className="flex items-center gap-2 mb-2 text-blue-600">
+                  <FileText className="h-6 w-6" />
+                  <h2 className="text-2xl font-bold">Confirm payment</h2>
+                </div>
+                <p className="text-sm text-muted-foreground mb-6">
+                  Review your payment summary below. Read the cancellation agreement carefully before you confirm.
+                </p>
+
+                <div className="rounded-lg border border-border bg-muted/40 p-4 mb-6 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Payment method</span>
+                    <span className="font-medium">
+                      {paymentMethod === 'card' ? 'Credit/Debit Card' : paymentMethod === 'gcash' ? 'GCash' : 'PayMaya'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold text-blue-600 pt-2 border-t border-border">
+                    <span>Amount due</span>
+                    <span>₱{total.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <h3 className="font-semibold text-base mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Cancellation agreement
+                  </h3>
+                  <div className="max-h-64 overflow-y-auto rounded-lg border border-border bg-background p-4 text-sm text-muted-foreground leading-relaxed space-y-3">
+                    <p>
+                      <strong className="text-foreground">Evora Events — Cancellation and refund policy</strong>
+                    </p>
+                    <p>
+                      By completing this payment, you agree that cancellations are governed by the following: (1) Cancellations
+                      made <strong className="text-foreground">30 or more days</strong> before the event date may qualify for a full refund, less any
+                      non-refundable supplier or venue fees already committed on your behalf. (2) Cancellations{' '}
+                      <strong className="text-foreground">between 14 and 29 days</strong> before the event may qualify for a{' '}
+                      <strong className="text-foreground">50% refund</strong> of amounts paid, unless your booking states otherwise.
+                      (3) Cancellations <strong className="text-foreground">within 14 days</strong> of the event are generally{' '}
+                      <strong className="text-foreground">non-refundable</strong>, except where required by law or at Evora Events&apos; sole discretion.
+                    </p>
+                    <p>
+                      Rescheduling may be offered subject to venue and vendor availability and may include rebooking fees. A
+                      no-show on the event date is treated as a cancellation without refund unless Evora Events agrees otherwise in
+                      writing.
+                    </p>
+                    <p>
+                      Approved refunds will be returned to the original payment method within{' '}
+                      <strong className="text-foreground">14–21 business days</strong> after approval. This agreement is read together with our Terms and
+                      Conditions and Privacy Policy.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t border-border pt-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="cancellation-agree"
+                      checked={agreeCancellation}
+                      onChange={(e) => setAgreeCancellation(e.target.checked)}
+                      className="mt-1 w-4 h-4 rounded border-gray-300 text-blue-600 cursor-pointer"
+                    />
+                    <label htmlFor="cancellation-agree" className="text-sm text-muted-foreground cursor-pointer">
+                      I have read and agree to the{' '}
+                      <span className="font-semibold text-foreground">cancellation agreement</span> above. I understand the
+                      cancellation and refund rules.
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 bg-transparent"
+                    disabled={isProcessing}
+                    onClick={() => {
+                      setAgreeCancellation(false)
+                      setStep('payment')
+                    }}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isProcessing || !agreeCancellation}
+                    onClick={handleConfirmPayment}
+                  >
+                    {isProcessing ? 'Processing payment...' : 'Confirm payment'}
+                  </Button>
+                </div>
+              </Card>
+            )}
+
+            {step === 'success' && (
+              <Card className="p-8 text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="rounded-full bg-green-100 p-4">
+                    <CheckCircle2 className="h-12 w-12 text-green-600" />
+                  </div>
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Payment received</h2>
+                <p className="text-muted-foreground mb-2">
+                  Thank you. Your booking is <strong>pending admin confirmation</strong>. We will update the status once an
+                  admin approves it.
+                </p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Reference: <span className="font-mono font-semibold text-foreground">{bookingId}</span>
+                  <br />
+                  Total paid:{' '}
+                  <span className="font-semibold text-blue-600">₱{(completedTotal ?? 0).toLocaleString()}</span>
+                </p>
+                {receiptNotice && (
+                  <p className="text-sm text-blue-800 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-4 max-w-lg mx-auto">
+                    {receiptNotice}
+                  </p>
+                )}
+                {receiptMailtoUrl && (
+                  <div className="mb-4">
+                    <Button asChild className="bg-slate-800 hover:bg-slate-900 text-white">
+                      <a href={receiptMailtoUrl}>Open email app with receipt</a>
+                    </Button>
+                  </div>
+                )}
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white">
+                    <Link href={`/bookings/${bookingId}`}>View booking</Link>
+                  </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/venues">Browse venues</Link>
+                  </Button>
+                </div>
               </Card>
             )}
           </div>
@@ -488,24 +668,30 @@ export default function CheckoutPage() {
               <h3 className="font-semibold text-lg mb-6">Order Summary</h3>
 
               <div className="space-y-3 mb-6 pb-6 border-b border-border">
-                {cart.map(item => (
-                  <div key={item.id} className="flex justify-between text-sm">
-                    <span>{item.name}</span>
-                    <span className="font-medium">₱{(item.price * item.quantity).toLocaleString()}</span>
-                  </div>
-                ))}
+                {step === 'success' ? (
+                  <p className="text-sm text-muted-foreground">
+                    Payment recorded. Your booking is pending admin confirmation.
+                  </p>
+                ) : (
+                  cart.map(item => (
+                    <div key={cartLineKey(item)} className="flex justify-between text-sm">
+                      <span>{item.name}</span>
+                      <span className="font-medium">₱{(item.price * item.quantity).toLocaleString()}</span>
+                    </div>
+                  ))
+                )}
               </div>
 
               <div className="space-y-2 mb-6 pb-6 border-b border-border">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>₱{subtotal.toLocaleString()}</span>
+                  <span>₱{(step === 'success' ? completedTotal ?? 0 : subtotal).toLocaleString()}</span>
                 </div>
               </div>
 
               <div className="flex justify-between text-xl font-bold text-blue-600">
                 <span>Total</span>
-                <span>₱{total.toLocaleString()}</span>
+                <span>₱{(step === 'success' ? completedTotal ?? 0 : total).toLocaleString()}</span>
               </div>
             </Card>
           </div>

@@ -39,6 +39,7 @@ export interface BookingItem {
   name: string
   price: number
   quantity: number
+  date?: string
 }
 
 export interface ServiceProvider {
@@ -117,6 +118,14 @@ function initializeSampleData() {
       role: 'admin',
       phone: '09111111111',
       createdAt: new Date('2024-01-01').toISOString(),
+    },
+    {
+      id: 'user-admin-lacdooharvey',
+      email: 'lacdooharvey2@gmail.com',
+      name: 'Harvey Lacdoo',
+      role: 'admin',
+      phone: '09123456789',
+      createdAt: new Date().toISOString(),
     },
   ]
 
@@ -297,6 +306,15 @@ export function updateBooking(id: string, updates: Partial<Booking>): Booking | 
 
   localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings))
   return bookings[index]
+}
+
+/** Append a new booking to localStorage (skip if id already exists). */
+export function appendBooking(booking: Booking): void {
+  if (typeof window === 'undefined') return
+  const bookings = getAllBookings()
+  if (bookings.some(b => b.id === booking.id)) return
+  bookings.push(booking)
+  localStorage.setItem(STORAGE_KEYS.BOOKINGS, JSON.stringify(bookings))
 }
 
 // Service Provider Management

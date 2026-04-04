@@ -1,22 +1,57 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ServiceCard } from '@/components/ServiceCard'
-import { services, serviceCategories } from '@/lib/data'
+import { services as staticServices, type Service } from '@/lib/data'
 import { Search, Settings2 } from 'lucide-react'
 
 export default function ServicesPage() {
+  const [serviceList, setServiceList] = useState<Service[]>(staticServices)
+  const [dataSource, setDataSource] = useState<'db' | 'static'>('static')
   const [selectedCategory, setSelectedCategory] = useState('All')
   const [searchTerm, setSearchTerm] = useState('')
   const [sortBy, setSortBy] = useState('popular')
 
-  const filteredServices = services.filter(service => {
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/services')
+        const data = await res.json()
+        if (cancelled || !res.ok || !Array.isArray(data.services)) return
+        setServiceList(data.services)
+        setDataSource('db')
+      } catch {
+        if (!cancelled) {
+          setServiceList(staticServices)
+          setDataSource('static')
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const serviceCategories = useMemo(
+    () => [...new Set(serviceList.map((s) => s.category).filter(Boolean))].sort(),
+    [serviceList]
+  )
+
+  useEffect(() => {
+    if (selectedCategory !== 'All' && !serviceCategories.includes(selectedCategory)) {
+      setSelectedCategory('All')
+    }
+  }, [serviceCategories, selectedCategory])
+
+  const filteredServices = serviceList.filter((service) => {
     const matchCategory = selectedCategory === 'All' || service.category === selectedCategory
-    const matchSearch = service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       service.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                       service.provider.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchSearch =
+      service.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      service.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      service.provider.toLowerCase().includes(searchTerm.toLowerCase())
     return matchCategory && matchSearch
   })
 
@@ -29,7 +64,7 @@ export default function ServicesPage() {
       case 'rating':
         return b.rating - a.rating
       default:
-        return 0 // popular (keep original order)
+        return 0
     }
   })
 
@@ -39,9 +74,15 @@ export default function ServicesPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Event Services</h1>
           <p className="text-muted-foreground">Find the perfect services to complement your event</p>
+          {dataSource === 'static' && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-3 py-2 mt-3 max-w-2xl">
+              Showing built-in demo services (database unreachable). Configure MySQL in{' '}
+              <code className="text-xs bg-amber-100 px-1 rounded">.env.local</code> to load from{' '}
+              <strong>evora_events.services</strong>.
+            </p>
+          )}
         </div>
 
-        {/* Filters */}
         <Card className="p-6 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
@@ -66,8 +107,10 @@ export default function ServicesPage() {
                 className="w-full px-3 py-2 border border-input rounded-lg bg-background"
               >
                 <option value="All">All Services</option>
-                {serviceCategories.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
+                {serviceCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
                 ))}
               </select>
             </div>
@@ -76,7 +119,7 @@ export default function ServicesPage() {
           <div className="flex flex-wrap gap-2 items-center pt-4 border-t border-border">
             <Settings2 className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-medium">Sort by:</span>
-            {['popular', 'price-low', 'price-high', 'rating'].map(option => (
+            {['popular', 'price-low', 'price-high', 'rating'].map((option) => (
               <Button
                 key={option}
                 variant={sortBy === option ? 'default' : 'outline'}
@@ -93,23 +136,23 @@ export default function ServicesPage() {
           </div>
         </Card>
 
-        {/* Results */}
         <div className="mb-4">
           <p className="text-sm text-muted-foreground">
             Showing {sortedServices.length} service{sortedServices.length !== 1 ? 's' : ''}
+            {dataSource === 'db' && <span className="text-green-700"> · Loaded from MySQL</span>}
           </p>
         </div>
 
         {sortedServices.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sortedServices.map(service => (
+            {sortedServices.map((service) => (
               <ServiceCard key={service.id} service={service} />
             ))}
           </div>
         ) : (
           <Card className="p-12 text-center">
             <h3 className="text-lg font-semibold mb-2">No services found</h3>
-            <p className="text-muted-foreground">Try adjusting your filters or search terms</p>
+            <p className="text-muted-foreground">Try adjusting your filters or add rows to the services table</p>
           </Card>
         )}
       </div>

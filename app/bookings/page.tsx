@@ -15,6 +15,9 @@ export default function BookingsPage() {
   const { isLoggedIn, user } = useAuth()
   const { bookings } = useApp()
 
+  const visibleBookings =
+    user?.role === 'admin' ? bookings : bookings.filter(b => b.userId === user?.id)
+
   useEffect(() => {
     if (!isLoggedIn) {
       router.push('/signin')
@@ -33,16 +36,32 @@ export default function BookingsPage() {
           <p className="text-muted-foreground">View and manage your event bookings</p>
         </div>
 
-        {bookings.length > 0 ? (
+        {visibleBookings.length > 0 ? (
           <div className="grid grid-cols-1 gap-4">
-            {bookings.map(booking => (
+            {visibleBookings.map(booking => (
               <Card key={booking.id} className="p-6">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-3">
                       <h3 className="text-xl font-semibold">Booking #{booking.id.slice(0, 8).toUpperCase()}</h3>
-                      <Badge className={`${booking.status === 'confirmed' ? 'bg-green-600' : booking.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'} text-white`}>
-                        {booking.status === 'confirmed' ? 'Confirmed' : booking.status === 'pending' ? 'Pending' : 'Cancelled'}
+                      <Badge
+                        className={`${
+                          booking.status === 'confirmed'
+                            ? 'bg-green-600'
+                            : booking.status === 'pending'
+                              ? 'bg-yellow-600'
+                              : booking.status === 'completed'
+                                ? 'bg-blue-600'
+                                : 'bg-red-600'
+                        } text-white`}
+                      >
+                        {booking.status === 'confirmed'
+                          ? 'Confirmed'
+                          : booking.status === 'pending'
+                            ? 'Pending approval'
+                            : booking.status === 'completed'
+                              ? 'Completed'
+                              : 'Cancelled'}
                       </Badge>
                     </div>
 

@@ -2,32 +2,66 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useParams } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { venues } from '@/lib/data'
+import { venues as staticVenues, type Venue } from '@/lib/data'
 import { useApp } from '@/contexts/AppContext'
 import { Star, Users, MapPin, Calendar, Heart, ArrowLeft, Check } from 'lucide-react'
 
 export default function VenueDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const venueId = params.id as string
-  const venue = venues.find(v => v.id === venueId)
+  const [venue, setVenue] = useState<Venue | null>(null)
+  const [loading, setLoading] = useState(true)
   const { addToCart } = useApp()
   const [isFavorited, setIsFavorited] = useState(false)
   const [selectedDate, setSelectedDate] = useState('')
   const [quantity, setQuantity] = useState(1)
   const [isAdded, setIsAdded] = useState(false)
 
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/venues/${encodeURIComponent(venueId)}`)
+        const data = await res.json()
+        if (!cancelled && res.ok && data.venue) {
+          setVenue(data.venue)
+          setLoading(false)
+          return
+        }
+      } catch {
+        /* fallback */
+      }
+      if (!cancelled) {
+        const fallback = staticVenues.find((v) => v.id === venueId) ?? null
+        setVenue(fallback)
+        setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [venueId])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading venue…</p>
+      </div>
+    )
+  }
+
   if (!venue) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="p-8 text-center">
           <h2 className="text-2xl font-bold mb-2">Venue Not Found</h2>
-          <p className="text-muted-foreground mb-4">The venue you're looking for doesn't exist.</p>
+          <p className="text-muted-foreground mb-4">The venue you&apos;re looking for doesn&apos;t exist.</p>
           <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white">
             <Link href="/venues">Back to Venues</Link>
           </Button>
@@ -58,7 +92,6 @@ export default function VenueDetailPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto max-w-6xl px-4 py-8">
-        {/* Back Button */}
         <Button variant="ghost" asChild className="mb-6">
           <Link href="/venues" className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
@@ -67,16 +100,16 @@ export default function VenueDetailPage() {
         </Button>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Image */}
           <div className="lg:col-span-2">
             <div className="relative h-96 bg-muted rounded-xl overflow-hidden mb-6">
               <Image
-                src={venue.image || "/placeholder.svg"}
+                src={venue.image || '/placeholder.svg'}
                 alt={venue.name}
                 fill
                 className="object-cover"
               />
               <button
+                type="button"
                 onClick={() => setIsFavorited(!isFavorited)}
                 className="absolute right-4 top-4 p-2 rounded-full bg-white/90 hover:bg-white shadow-md transition-colors"
               >
@@ -84,7 +117,6 @@ export default function VenueDetailPage() {
               </button>
             </div>
 
-            {/* Venue Info */}
             <div className="space-y-6">
               <div>
                 <div className="flex items-start justify-between mb-3">
@@ -98,7 +130,7 @@ export default function VenueDetailPage() {
                   <Badge className="bg-blue-600">{venue.category}</Badge>
                 </div>
 
-                <div className="flex items-center gap-4 mt-4">
+                <div className="flex items-center gap-4 mt-4 flex-wrap">
                   <div className="flex items-center gap-1">
                     <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
                     <span className="font-semibold">{venue.rating}</span>
@@ -109,6 +141,12 @@ export default function VenueDetailPage() {
                     <Users className="h-4 w-4" />
                     Up to {venue.capacity} guests
                   </span>
+                  {venue.theme ? (
+                    <>
+                      <span className="text-muted-foreground">•</span>
+                      <span className="text-sm text-muted-foreground">Theme: {venue.theme}</span>
+                    </>
+                  ) : null}
                 </div>
               </div>
 
@@ -117,27 +155,26 @@ export default function VenueDetailPage() {
                 <p className="text-foreground/80 leading-relaxed">{venue.description}</p>
               </div>
 
-              <div>
-                <h2 className="text-xl font-semibold mb-3">Amenities</h2>
-                <div className="grid grid-cols-2 gap-3">
-                  {venue.amenities.map((amenity, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <Check className="h-4 w-4 text-green-600" />
-                      <span className="text-foreground/80">{amenity}</span>
-                    </div>
-                  ))}
+              {venue.amenities.length > 0 ? (
+                <div>
+                  <h2 className="text-xl font-semibold mb-3">Amenities</h2>
+                  <div className="grid grid-cols-2 gap-3">
+                    {venue.amenities.map((amenity, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-green-600" />
+                        <span className="text-foreground/80">{amenity}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
           </div>
 
-          {/* Booking Card */}
           <div>
             <Card className="p-6 sticky top-24 space-y-6">
               <div>
-                <div className="text-3xl font-bold text-blue-600 mb-1">
-                  ₱{venue.price.toLocaleString()}
-                </div>
+                <div className="text-3xl font-bold text-blue-600 mb-1">₱{venue.price.toLocaleString()}</div>
                 <p className="text-sm text-muted-foreground">per booking</p>
               </div>
 
@@ -158,6 +195,7 @@ export default function VenueDetailPage() {
                 <label className="text-sm font-medium mb-2 block">Quantity</label>
                 <div className="flex items-center gap-2 border border-input rounded-lg p-1">
                   <button
+                    type="button"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     className="w-8 h-8 flex items-center justify-center hover:bg-muted rounded"
                   >
@@ -165,6 +203,7 @@ export default function VenueDetailPage() {
                   </button>
                   <span className="flex-1 text-center font-medium">{quantity}</span>
                   <button
+                    type="button"
                     onClick={() => setQuantity(quantity + 1)}
                     className="w-8 h-8 flex items-center justify-center hover:bg-muted rounded"
                   >
@@ -194,7 +233,7 @@ export default function VenueDetailPage() {
               </Link>
 
               <div className="p-4 bg-blue-50 rounded-lg space-y-2">
-                <h4 className="font-semibold text-sm text-blue-900">What's Included?</h4>
+                <h4 className="font-semibold text-sm text-blue-900">What&apos;s Included?</h4>
                 <ul className="text-xs text-blue-900 space-y-1">
                   <li>✓ Venue rental for 8 hours</li>
                   <li>✓ Tables and chairs setup</li>

@@ -4,33 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
-declare global {
-  interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (options: {
-            client_id: string
-            callback: (response: { credential?: string }) => void
-          }) => void
-          renderButton: (
-            parent: HTMLElement,
-            options: {
-              type?: 'standard' | 'icon'
-              theme?: 'outline' | 'filled_blue' | 'filled_black'
-              size?: 'large' | 'medium' | 'small'
-              text?: 'signin_with' | 'signup_with' | 'continue_with' | 'signin'
-              shape?: 'rectangular' | 'pill' | 'circle' | 'square'
-              logo_alignment?: 'left' | 'center'
-              width?: number
-            }
-          ) => void
-        }
-      }
-    }
-  }
-}
-
 const GOOGLE_CLIENT_ID = '255687396164-l1nrorhkguiartgu58sa059umd462brn.apps.googleusercontent.com'
 
 function decodeGoogleCredential(token: string): { email?: string; name?: string } {
@@ -38,7 +11,8 @@ function decodeGoogleCredential(token: string): { email?: string; name?: string 
     const payload = token.split('.')[1]
     if (!payload) return {}
     const normalized = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const decoded = JSON.parse(atob(normalized))
+    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
+    const decoded = JSON.parse(atob(padded))
     return {
       email: typeof decoded.email === 'string' ? decoded.email : undefined,
       name: typeof decoded.name === 'string' ? decoded.name : undefined,
@@ -51,70 +25,80 @@ function decodeGoogleCredential(token: string): { email?: string; name?: string 
 export function GoogleLoginButton() {
   const router = useRouter()
   const { loginWithGoogle } = useAuth()
-  const btnRef = useRef<HTMLDivElement | null>(null)
+  const loginWithGoogleRef = useRef(loginWithGoogle)
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    let mounted = true
-
-    const renderGoogle = () => {
-      if (!mounted || !btnRef.current || !window.google?.accounts?.id) return
-      btnRef.current.innerHTML = ''
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: async (response) => {
-          setError('')
-          const credential = response.credential
-          if (!credential) {
-            setError('Google login failed. Please try again.')
-            return
-          }
-          const { email, name } = decodeGoogleCredential(credential)
-          if (!email) {
-            setError('Google account email is missing.')
-            return
-          }
-          try {
-            await loginWithGoogle(email, name)
-            router.push('/venues')
-          } catch {
-            setError('Google login failed. Please try again.')
-          }
-        },
-      })
-      window.google.accounts.id.renderButton(btnRef.current, {
-        type: 'standard',
-        theme: 'outline',
-        size: 'large',
-        text: 'continue_with',
-        shape: 'rectangular',
-        logo_alignment: 'left',
-        width: 320,
-      })
-    }
-
-    const existing = document.querySelector('script[data-google-gsi="true"]') as HTMLScriptElement | null
-    if (existing) {
-      if (window.google?.accounts?.id) renderGoogle()
-      else existing.addEventListener('load', renderGoogle, { once: true })
-    } else {
-      const script = document.createElement('script')
-      script.src = 'https://accounts.google.com/gsi/client'
-      script.async = true
-      script.defer = true
-      script.dataset.googleGsi = 'true'
-      script.onload = renderGoogle
-      document.head.appendChild(script)
-    }
-
-    return () => {
-      mounted = false
-    }
+    loginWithGoogleRef.current = loginWithGoogle
   }, [loginWithGoogle])
+
+  useEffect(() => {
+    const hash = window.location.hash.replace(/^#/, '')
+    if (!hash.includes('id_token=')) return
+
+    const params = new URLSearchParams(hash)
+    const idToken = params.get('id_token')
+    const nonce = params.get('nonce')
+    const expectedNonce = sessionStorage.getItem('google_auth_nonce')
+    sessionStorage.removeItem('google_auth_nonce')
+    if (!idToken) return
+    if (!nonce || !expectedNonce || nonce !== expectedNonce) {
+      setError('Google login security check failed. Please try again.')
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+      return
+    }
+
+    const { email, name } = decodeGoogleCredential(idToken)
+    if (!email) {
+      setError('Google login redirect failed. Please try again.')
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+      return
+    }
+
+    setLoading(true)
+    void loginWithGoogleRef.current(email, name)
+      .then(() => {
+        history.replaceState(null, '', window.location.pathname + window.location.search)
+        router.replace('/venues')
+        window.location.assign('/venues')
+      })
+      .catch(() => {
+        setError('Google login failed after redirect. Please try again.')
+      })
+      .finally(() => setLoading(false))
+  }, [router])
+
+  const startRedirectGoogle = () => {
+    const redirectUri = window.location.origin + window.location.pathname
+    const nonce = crypto.randomUUID()
+    sessionStorage.setItem('google_auth_nonce', nonce)
+    const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')
+    url.searchParams.set('client_id', GOOGLE_CLIENT_ID)
+    url.searchParams.set('redirect_uri', redirectUri)
+    url.searchParams.set('response_type', 'id_token')
+    url.searchParams.set('scope', 'openid email profile')
+    url.searchParams.set('nonce', nonce)
+    url.searchParams.set('prompt', 'select_account')
+    window.location.assign(url.toString())
+  }
 
   return (
     <div className="space-y-2">
-      <div ref={btnRef} className="flex justify-center" />
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={startRedirectGoogle}
+          className="h-11 px-5 rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground text-sm font-medium inline-flex items-center gap-2"
+          disabled={loading}
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden="true">
+            <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.3-1.5 3.9-5.5 3.9-3.3 0-6-2.7-6-6s2.7-6 6-6c1.9 0 3.2.8 3.9 1.5l2.7-2.6C17 3.3 14.7 2.2 12 2.2 6.6 2.2 2.2 6.6 2.2 12S6.6 21.8 12 21.8c6.9 0 9.6-4.8 9.6-7.3 0-.5-.1-.9-.1-1.3H12z"/>
+          </svg>
+          {loading ? 'Signing in...' : 'Sign in with Google'}
+        </button>
+      </div>
+      {loading ? <p className="text-xs text-muted-foreground text-center">Signing in with Google...</p> : null}
       {error ? <p className="text-xs text-red-600 text-center">{error}</p> : null}
     </div>
   )

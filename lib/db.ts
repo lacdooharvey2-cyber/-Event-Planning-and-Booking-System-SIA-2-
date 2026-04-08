@@ -26,9 +26,9 @@ export function getPool(): mysql.Pool {
 
 export async function queryDb<T = mysql.RowDataPacket[]>(
   sql: string,
-  params?: unknown[]
+  params: unknown[] = []
 ): Promise<T> {
   const pool = getPool()
-  const [rows] = await pool.execute(sql, params)
+  const [rows] = await pool.query(sql, params as unknown[])
   return rows as T
 }

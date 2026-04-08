@@ -74,13 +74,6 @@ export default function ServicesPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Event Services</h1>
           <p className="text-muted-foreground">Find the perfect services to complement your event</p>
-          {dataSource === 'static' && (
-            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-3 py-2 mt-3 max-w-2xl">
-              Showing built-in demo services (database unreachable). Configure MySQL in{' '}
-              <code className="text-xs bg-amber-100 px-1 rounded">.env.local</code> to load from{' '}
-              <strong>evora_events.services</strong>.
-            </p>
-          )}
         </div>
 
         <Card className="p-6 mb-8">

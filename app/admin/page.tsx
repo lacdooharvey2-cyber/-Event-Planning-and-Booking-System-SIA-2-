@@ -7,14 +7,85 @@ import { useApp } from '@/contexts/AppContext'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { BarChart3, Users, Building2, CreditCard, TrendingUp, AlertCircle } from 'lucide-react'
-import { useEffect } from 'react'
+import { Users, Building2, CreditCard, TrendingUp, AlertCircle, Database } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+
+type AdminDbStats = {
+  venuesCount: number
+  servicesCount: number
+  ordersCount: number
+  pendingOrders: number
+  revenueAllTime: number
+  revenueThisMonth: number
+  usersCount: number
+}
 
 export default function AdminPage() {
   const router = useRouter()
   const { user, isLoggedIn } = useAuth()
   const { bookings, updateBooking } = useApp()
+  const [dbStats, setDbStats] = useState<AdminDbStats | null>(null)
+  const [dbAvailable, setDbAvailable] = useState(false)
   const pendingBookings = bookings.filter(b => b.status === 'pending')
+
+  const systemStats = useMemo(() => {
+    const now = new Date()
+    const month = now.getMonth()
+    const year = now.getFullYear()
+    const thisMonthBookings = bookings.filter(b => {
+      const d = new Date(b.createdAt)
+      return d.getMonth() === month && d.getFullYear() === year
+    })
+    const thisMonthRevenue = thisMonthBookings.reduce((sum, b) => sum + b.totalAmount, 0)
+    const allRevenue = bookings.reduce((sum, b) => sum + b.totalAmount, 0)
+    const avgBooking = bookings.length ? allRevenue / bookings.length : 0
+    return {
+      totalBookings: bookings.length,
+      pendingBookings: bookings.filter(b => b.status === 'pending').length,
+      thisMonthBookings: thisMonthBookings.length,
+      thisMonthRevenue,
+      allRevenue,
+      avgBooking,
+    }
+  }, [bookings])
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/admin/stats')
+        const data = await res.json()
+        if (cancelled || !res.ok || !data?.ok) return
+        setDbStats(data.stats as AdminDbStats)
+        setDbAvailable(true)
+      } catch {
+        if (!cancelled) {
+          setDbAvailable(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const usersListCount = useMemo(() => {
+    if (typeof window === 'undefined') return 0
+    const rawA = localStorage.getItem('eventhub_users')
+    const rawB = localStorage.getItem('eventhub_users_list')
+    const arrA = rawA ? (JSON.parse(rawA) as Array<{ id: string; role?: string }>) : []
+    const arrB = rawB ? (JSON.parse(rawB) as Array<{ id: string; role?: string }>) : []
+    return [...arrA, ...arrB].length
+  }, [])
+
+  const totalUsers = dbStats?.usersCount || usersListCount
+  const totalVenues = dbStats?.venuesCount ?? 0
+  const totalServices = dbStats?.servicesCount ?? 0
+  const totalBookings = Math.max(systemStats.totalBookings, dbStats?.ordersCount ?? 0)
+  const totalRevenue = Math.max(systemStats.allRevenue, dbStats?.revenueAllTime ?? 0)
+  const monthRevenue = Math.max(systemStats.thisMonthRevenue, dbStats?.revenueThisMonth ?? 0)
+  const monthBookings = Math.max(systemStats.thisMonthBookings, 0)
+  const pendingTotal = Math.max(systemStats.pendingBookings, dbStats?.pendingOrders ?? 0)
 
   useEffect(() => {
     if (!isLoggedIn || user?.role !== 'admin') {
@@ -31,7 +102,15 @@ export default function AdminPage() {
       <div className="container mx-auto max-w-7xl px-4 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-2">Manage EventHub platform and users</p>
+          <p className="text-muted-foreground mt-2">
+            Live metrics from system data {dbAvailable ? 'and MySQL database' : '(DB unavailable, using system fallback)'}
+          </p>
+          <div className="mt-3 flex items-center gap-2">
+            <Badge className={dbAvailable ? 'bg-green-600 text-white' : 'bg-amber-600 text-white'}>
+              <Database className="h-3 w-3 mr-1" />
+              {dbAvailable ? 'Database connected' : 'Database not connected'}
+            </Badge>
+          </div>
         </div>
 
         {/* Stats Grid */}
@@ -41,8 +120,8 @@ export default function AdminPage() {
               <h3 className="text-sm font-medium text-muted-foreground">Total Users</h3>
               <Users className="h-4 w-4 text-blue-600" />
             </div>
-            <div className="text-2xl font-bold">1,234</div>
-            <p className="text-xs text-green-600 mt-2">+12% from last month</p>
+            <div className="text-2xl font-bold">{totalUsers.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-2">From users table / system registry</p>
           </Card>
 
           <Card className="p-6">
@@ -50,8 +129,8 @@ export default function AdminPage() {
               <h3 className="text-sm font-medium text-muted-foreground">Total Venues</h3>
               <Building2 className="h-4 w-4 text-blue-600" />
             </div>
-            <div className="text-2xl font-bold">156</div>
-            <p className="text-xs text-green-600 mt-2">+8% from last month</p>
+            <div className="text-2xl font-bold">{totalVenues.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-2">Loaded from `venues` table</p>
           </Card>
 
           <Card className="p-6">
@@ -59,8 +138,10 @@ export default function AdminPage() {
               <h3 className="text-sm font-medium text-muted-foreground">Total Bookings</h3>
               <CreditCard className="h-4 w-4 text-blue-600" />
             </div>
-            <div className="text-2xl font-bold">892</div>
-            <p className="text-xs text-green-600 mt-2">+24% from last month</p>
+            <div className="text-2xl font-bold">{totalBookings.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Pending: <span className="font-semibold text-yellow-700">{pendingTotal}</span>
+            </p>
           </Card>
 
           <Card className="p-6">
@@ -68,8 +149,8 @@ export default function AdminPage() {
               <h3 className="text-sm font-medium text-muted-foreground">Revenue</h3>
               <TrendingUp className="h-4 w-4 text-blue-600" />
             </div>
-            <div className="text-2xl font-bold">₱2.5M</div>
-            <p className="text-xs text-green-600 mt-2">+18% from last month</p>
+            <div className="text-2xl font-bold">₱{totalRevenue.toLocaleString()}</div>
+            <p className="text-xs text-muted-foreground mt-2">All-time collected amount</p>
           </Card>
         </div>
 
@@ -81,15 +162,17 @@ export default function AdminPage() {
             <div className="space-y-3 mb-6">
               <div className="flex justify-between items-center p-3 bg-muted rounded">
                 <span className="text-sm">Total Customers</span>
-                <span className="font-semibold">945</span>
+                <span className="font-semibold">
+                  {bookings.reduce((set, b) => set.add(b.userId), new Set<string>()).size}
+                </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted rounded">
                 <span className="text-sm">Venue Owners</span>
-                <span className="font-semibold">156</span>
+                <span className="font-semibold">N/A</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted rounded">
                 <span className="text-sm">Admins</span>
-                <span className="font-semibold">3</span>
+                <span className="font-semibold">{user?.role === 'admin' ? 1 : 0}</span>
               </div>
             </div>
             <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" asChild>
@@ -103,15 +186,15 @@ export default function AdminPage() {
             <div className="space-y-3 mb-6">
               <div className="flex justify-between items-center p-3 bg-muted rounded">
                 <span className="text-sm">Active Venues</span>
-                <span className="font-semibold">156</span>
+                <span className="font-semibold">{totalVenues}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted rounded">
                 <span className="text-sm">Pending Approval</span>
-                <Badge className="bg-yellow-600 text-white">12</Badge>
+                <Badge className="bg-yellow-600 text-white">0</Badge>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted rounded">
                 <span className="text-sm">Reported Issues</span>
-                <Badge className="bg-red-600 text-white">3</Badge>
+                <Badge className="bg-red-600 text-white">0</Badge>
               </div>
             </div>
             <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" asChild>
@@ -125,15 +208,17 @@ export default function AdminPage() {
             <div className="space-y-3 mb-6">
               <div className="flex justify-between items-center p-3 bg-muted rounded">
                 <span className="text-sm">Total Services</span>
-                <span className="font-semibold">342</span>
+                <span className="font-semibold">{totalServices.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted rounded">
                 <span className="text-sm">Service Providers</span>
-                <span className="font-semibold">89</span>
+                <span className="font-semibold">
+                  {new Set(bookings.flatMap(b => b.items.filter(i => i.type === 'service').map(i => i.id))).size}
+                </span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted rounded">
                 <span className="text-sm">Inactive Services</span>
-                <span className="font-semibold">12</span>
+                <span className="font-semibold">0</span>
               </div>
             </div>
             <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" asChild>
@@ -147,15 +232,15 @@ export default function AdminPage() {
             <div className="space-y-3 mb-6">
               <div className="flex justify-between items-center p-3 bg-muted rounded">
                 <span className="text-sm">This Month's Bookings</span>
-                <span className="font-semibold">234</span>
+                <span className="font-semibold">{monthBookings.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted rounded">
                 <span className="text-sm">This Month's Revenue</span>
-                <span className="font-semibold">₱845K</span>
+                <span className="font-semibold">₱{monthRevenue.toLocaleString()}</span>
               </div>
               <div className="flex justify-between items-center p-3 bg-muted rounded">
                 <span className="text-sm">Avg. Booking Value</span>
-                <span className="font-semibold">₱61K</span>
+                <span className="font-semibold">₱{Math.round(systemStats.avgBooking).toLocaleString()}</span>
               </div>
             </div>
             <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" asChild>
@@ -212,33 +297,39 @@ export default function AdminPage() {
           )}
         </Card>
 
-        {/* Recent Issues */}
+        {/* System & Data Notes */}
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <AlertCircle className="h-5 w-5 text-red-600" />
-            <h2 className="text-xl font-semibold">Recent Issues & Reports</h2>
+            <h2 className="text-xl font-semibold">System Notes</h2>
           </div>
           <div className="space-y-3">
-            <div className="flex items-start justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <div>
-                <p className="font-medium">Venue not responding to inquiries</p>
-                <p className="text-sm text-muted-foreground">Glass Garden Hall - reported 2 hours ago</p>
+                <p className="font-medium">Bookings in system context: {systemStats.totalBookings}</p>
+                <p className="text-sm text-muted-foreground">
+                  Includes checkouts made in this running app session (and persisted local bookings).
+                </p>
               </div>
-              <Badge className="bg-red-600">High</Badge>
+              <Badge className="bg-blue-600">Info</Badge>
             </div>
-            <div className="flex items-start justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-start justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
               <div>
-                <p className="font-medium">Service provider contact invalid</p>
-                <p className="text-sm text-muted-foreground">DJ & Sound System - reported 1 day ago</p>
+                <p className="font-medium">Bookings in DB orders table: {(dbStats?.ordersCount ?? 0).toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground">
+                  Written via `/api/orders`; used for cross-session analytics and phpMyAdmin reporting.
+                </p>
               </div>
-              <Badge className="bg-yellow-600">Medium</Badge>
+              <Badge className="bg-green-600">DB</Badge>
             </div>
-            <div className="flex items-start justify-between p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-start justify-between p-4 bg-amber-50 border border-amber-200 rounded-lg">
               <div>
-                <p className="font-medium">Payment declined - refund pending</p>
-                <p className="text-sm text-muted-foreground">Booking #ABC123 - reported 3 days ago</p>
+                <p className="font-medium">Total pending approvals: {pendingTotal}</p>
+                <p className="text-sm text-muted-foreground">
+                  Value comes from both app bookings and DB pending orders, whichever is higher.
+                </p>
               </div>
-              <Badge className="bg-yellow-600">Medium</Badge>
+              <Badge className="bg-amber-600">Action</Badge>
             </div>
           </div>
         </Card>

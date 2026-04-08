@@ -6,7 +6,9 @@
     "dev": "next dev --turbo",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:check": "node scripts/db-check.mjs",
+    "db:seed": "node scripts/db-seed.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

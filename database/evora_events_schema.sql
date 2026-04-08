@@ -66,27 +66,27 @@ CREATE TABLE IF NOT EXISTS services (
 -- ---------------------------------------------------------------------------
 -- orders / order_items (bookings from checkout — user_id matches AuthContext string ids)
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS orders (
-  id VARCHAR(64) NOT NULL,
-  user_id VARCHAR(64) NOT NULL,
-  total_amount DECIMAL(12, 2) NOT NULL,
-  status VARCHAR(32) NOT NULL DEFAULT 'pending',
-  event_date DATE NULL,
-  guest_count INT UNSIGNED NOT NULL DEFAULT 0,
-  location VARCHAR(500) NULL,
-  customer_name VARCHAR(255) NULL,
-  customer_email VARCHAR(255) NULL,
-  customer_phone VARCHAR(100) NULL,
-  payment_method VARCHAR(120) NULL,
-  card_last4 VARCHAR(16) NULL,
-  transaction_id VARCHAR(128) NULL,
-  paid_at DATETIME NULL,
-  created_at DATETIME NOT NULL,
-  updated_at DATETIME NOT NULL,
-  PRIMARY KEY (id),
-  KEY idx_orders_user (user_id),
-  KEY idx_orders_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  CREATE TABLE IF NOT EXISTS orders (
+    id VARCHAR(64) NOT NULL,
+    user_id VARCHAR(64) NOT NULL,
+    total_amount DECIMAL(12, 2) NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    event_date DATE NULL,
+    guest_count INT UNSIGNED NOT NULL DEFAULT 0,
+    location VARCHAR(500) NULL,
+    customer_name VARCHAR(255) NULL,
+    customer_email VARCHAR(255) NULL,
+    customer_phone VARCHAR(100) NULL,
+    payment_method VARCHAR(120) NULL,
+    card_last4 VARCHAR(16) NULL,
+    transaction_id VARCHAR(128) NULL,
+    paid_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_orders_user (user_id),
+    KEY idx_orders_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE IF NOT EXISTS order_items (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT,

@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/contexts/AuthContext'
+import { GoogleLoginButton } from '@/components/GoogleLoginButton'
 import { AlertCircle } from 'lucide-react'
 
 export default function SignIn() {
@@ -80,6 +81,13 @@ export default function SignIn() {
               {isLoading ? 'Signing In...' : 'Sign In'}
             </Button>
           </form>
+
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">or</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          <GoogleLoginButton />
 
           <div className="mt-6 text-center text-sm space-y-3">
             <p className="text-muted-foreground">

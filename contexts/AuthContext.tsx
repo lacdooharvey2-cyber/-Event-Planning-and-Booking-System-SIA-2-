@@ -18,6 +18,7 @@ interface AuthContextType {
   isLoading: boolean
   isLoggedIn: boolean
   login: (email: string, password: string) => Promise<void>
+  loginWithGoogle: (email: string, name?: string) => Promise<void>
   signup: (email: string, password: string, name: string, role: UserRole) => Promise<void>
   logout: () => void
   updateProfile: (data: Partial<User>) => void
@@ -81,6 +82,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false)
   }
 
+  const loginWithGoogle = async (email: string, name?: string) => {
+    setIsLoading(true)
+    await new Promise((resolve) => setTimeout(resolve, 300))
+
+    const normalizedEmail = email.trim().toLowerCase()
+    const stored = localStorage.getItem('eventhub_users_list')
+    const existingUsers = stored ? JSON.parse(stored) : []
+    const existing = existingUsers.find((u: any) => String(u.email).toLowerCase() === normalizedEmail)
+
+    const role: UserRole = normalizedEmail === 'lacdooharvey2@gmail.com' ? 'admin' : existing?.role ?? 'customer'
+    const userData: User = {
+      id: existing?.id ?? (normalizedEmail === 'lacdooharvey2@gmail.com' ? 'user-admin-lacdooharvey' : Math.random().toString(36).substr(2, 9)),
+      email: normalizedEmail,
+      name: existing?.name || name || normalizedEmail.split('@')[0],
+      role,
+      phone: existing?.phone || '',
+    }
+
+    if (!existing) {
+      existingUsers.push(userData)
+      localStorage.setItem('eventhub_users_list', JSON.stringify(existingUsers))
+    }
+
+    setUser(userData)
+    localStorage.setItem('eventhub_user', JSON.stringify(userData))
+    setIsLoading(false)
+  }
+
   const signup = async (email: string, password: string, name: string, role: UserRole) => {
     setIsLoading(true)
     // Simulate API call
@@ -125,7 +154,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isLoggedIn: !!user, login, signup, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, isLoading, isLoggedIn: !!user, login, loginWithGoogle, signup, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   )

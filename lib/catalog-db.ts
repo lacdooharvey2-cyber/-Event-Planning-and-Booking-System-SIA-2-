@@ -23,8 +23,10 @@ type VenueRow = RowDataPacket & {
 type ServiceRow = RowDataPacket & {
   id: number | string
   name: string
+  service_name?: string | null
   category?: string | null
   price?: number | string | null
+  base_price?: number | string | null
   description?: string | null
   image?: string | null
   image_url?: string | null
@@ -78,11 +80,13 @@ export function mapVenueRow(row: VenueRow): Venue {
 }
 
 export function mapServiceRow(row: ServiceRow): Service {
+  const serviceName = row.name || row.service_name || 'Service'
+  const servicePrice = Number(row.price ?? row.base_price) || 0
   return {
     id: String(row.id),
-    name: row.name,
+    name: serviceName,
     category: row.category ?? 'Other',
-    price: Number(row.price) || 0,
+    price: servicePrice,
     description: row.description ?? '',
     image: row.image_url || row.image || '/placeholder.svg',
     rating: Number(row.rating) || 0,
@@ -94,7 +98,7 @@ const VENUES_SQL = `
   SELECT
     v.*,
     (
-      SELECT t.name
+      SELECT t.theme_name
       FROM venue_themes vt
       INNER JOIN themes t ON t.id = vt.theme_id
       WHERE vt.venue_id = v.id
@@ -128,7 +132,7 @@ export async function fetchVenueByIdFromDb(id: string): Promise<Venue | null> {
       SELECT
         v.*,
         (
-          SELECT t.name
+          SELECT t.theme_name
           FROM venue_themes vt
           INNER JOIN themes t ON t.id = vt.theme_id
           WHERE vt.venue_id = v.id

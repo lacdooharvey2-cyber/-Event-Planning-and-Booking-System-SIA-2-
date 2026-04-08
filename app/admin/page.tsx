@@ -297,42 +297,6 @@ export default function AdminPage() {
           )}
         </Card>
 
-        {/* System & Data Notes */}
-        <Card className="p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertCircle className="h-5 w-5 text-red-600" />
-            <h2 className="text-xl font-semibold">System Notes</h2>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-start justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div>
-                <p className="font-medium">Bookings in system context: {systemStats.totalBookings}</p>
-                <p className="text-sm text-muted-foreground">
-                  Includes checkouts made in this running app session (and persisted local bookings).
-                </p>
-              </div>
-              <Badge className="bg-blue-600">Info</Badge>
-            </div>
-            <div className="flex items-start justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div>
-                <p className="font-medium">Bookings in DB orders table: {(dbStats?.ordersCount ?? 0).toLocaleString()}</p>
-                <p className="text-sm text-muted-foreground">
-                  Written via `/api/orders`; used for cross-session analytics and phpMyAdmin reporting.
-                </p>
-              </div>
-              <Badge className="bg-green-600">DB</Badge>
-            </div>
-            <div className="flex items-start justify-between p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <div>
-                <p className="font-medium">Total pending approvals: {pendingTotal}</p>
-                <p className="text-sm text-muted-foreground">
-                  Value comes from both app bookings and DB pending orders, whichever is higher.
-                </p>
-              </div>
-              <Badge className="bg-amber-600">Action</Badge>
-            </div>
-          </div>
-        </Card>
       </div>
     </div>
   )

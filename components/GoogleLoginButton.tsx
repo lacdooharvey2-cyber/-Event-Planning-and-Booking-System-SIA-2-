@@ -70,7 +70,7 @@ export function GoogleLoginButton() {
   }, [router])
 
   const startRedirectGoogle = () => {
-    const redirectUri = window.location.origin + window.location.pathname
+    const redirectUri = window.location.origin + '/signin'
     const nonce = crypto.randomUUID()
     sessionStorage.setItem('google_auth_nonce', nonce)
     const url = new URL('https://accounts.google.com/o/oauth2/v2/auth')

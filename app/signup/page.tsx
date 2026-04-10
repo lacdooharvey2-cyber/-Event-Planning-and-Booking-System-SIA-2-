@@ -47,8 +47,8 @@ export default function SignUp() {
       const fullName = `${formData.firstname} ${formData.middlename} ${formData.lastname}`
 await signup(formData.email, formData.password, fullName, formData.role as any)
       router.push('/venues')
-    } catch {
-      setError('Failed to create account')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create account')
     } finally {
       setIsLoading(false)
     }

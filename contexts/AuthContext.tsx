@@ -26,6 +26,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+function getUsersListSafe(): User[] {
+  try {
+    const stored = localStorage.getItem('eventhub_users_list')
+    if (!stored) return []
+    const parsed = JSON.parse(stored)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    localStorage.removeItem('eventhub_users_list')
+    return []
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -87,8 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await new Promise((resolve) => setTimeout(resolve, 300))
 
     const normalizedEmail = email.trim().toLowerCase()
-    const stored = localStorage.getItem('eventhub_users_list')
-    const existingUsers = stored ? JSON.parse(stored) : []
+    const existingUsers = getUsersListSafe()
     const existing = existingUsers.find((u: any) => String(u.email).toLowerCase() === normalizedEmail)
 
     const role: UserRole = normalizedEmail === 'lacdooharvey2@gmail.com' ? 'admin' : existing?.role ?? 'customer'
@@ -115,18 +126,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 500))
 
+    const normalizedEmail = email.trim().toLowerCase()
+    const cleanName = name.replace(/\s+/g, ' ').trim()
+
+    if (!normalizedEmail) {
+      setIsLoading(false)
+      throw new Error('Email is required')
+    }
+
+    if (!cleanName) {
+      setIsLoading(false)
+      throw new Error('Name is required')
+    }
+
+    if (role === 'admin') {
+      setIsLoading(false)
+      throw new Error('Admin account creation is restricted. Please contact support.')
+    }
+
     // Check if email already exists
-    const stored = localStorage.getItem('eventhub_users_list')
-    const existingUsers = stored ? JSON.parse(stored) : []
-    if (existingUsers.some((u: any) => u.email === email)) {
+    const existingUsers = getUsersListSafe()
+    if (existingUsers.some((u: any) => String(u.email).toLowerCase() === normalizedEmail)) {
       setIsLoading(false)
       throw new Error('Email already registered')
     }
 
     const newUser: User = {
       id: Math.random().toString(36).substr(2, 9),
-      email,
-      name,
+      email: normalizedEmail,
+      name: cleanName,
       role: role || 'customer',
       phone: '',
     }

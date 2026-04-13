@@ -101,3 +101,33 @@ CREATE TABLE IF NOT EXISTS order_items (
   KEY idx_order_items_order (order_id),
   CONSTRAINT fk_order_items_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ---------------------------------------------------------------------------
+-- payments (detailed payment tracking for orders)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS payments (
+  id VARCHAR(64) NOT NULL,
+  order_id VARCHAR(64) NOT NULL,
+  amount DECIMAL(12, 2) NOT NULL,
+  currency VARCHAR(3) NOT NULL DEFAULT 'PHP',
+  payment_method ENUM('credit_card', 'debit_card', 'bank_transfer', 'cash', 'paypal', 'gcash', 'maya', 'other') NOT NULL,
+  payment_gateway VARCHAR(50) NULL COMMENT 'e.g., stripe, paypal, paymongo',
+  gateway_transaction_id VARCHAR(128) NULL,
+  gateway_payment_id VARCHAR(128) NULL,
+  status ENUM('pending', 'processing', 'completed', 'failed', 'cancelled', 'refunded', 'partially_refunded') NOT NULL DEFAULT 'pending',
+  card_brand VARCHAR(20) NULL COMMENT 'visa, mastercard, amex, etc.',
+  card_last4 VARCHAR(4) NULL,
+  card_country VARCHAR(2) NULL,
+  failure_reason TEXT NULL,
+  refunded_amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  refund_reason TEXT NULL,
+  metadata JSON NULL COMMENT 'Additional payment data from gateway',
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  completed_at DATETIME NULL,
+  PRIMARY KEY (id),
+  KEY idx_payments_order (order_id),
+  KEY idx_payments_status (status),
+  KEY idx_payments_gateway (payment_gateway),
+  CONSTRAINT fk_payments_order FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;

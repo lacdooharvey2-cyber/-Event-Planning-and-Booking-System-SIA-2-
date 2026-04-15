@@ -1,5 +1,7 @@
 'use client'
 
+import supabase from '@/lib/supabase'
+
 export interface User {
   id: string
   email: string
@@ -406,3 +408,46 @@ export function clearCart(): void {
 if (typeof window !== 'undefined') {
   initializeSampleData()
 }
+
+const STORAGE_BUCKET = process.env.NEXT_PUBLIC_SUPABASE_STORAGE_BUCKET ?? 'public'
+
+export async function uploadFileToStorage(
+  filePath: string,
+  file: File | Blob | ArrayBuffer | Uint8Array,
+  bucket = STORAGE_BUCKET
+): Promise<string> {
+  const uploadPayload = file instanceof ArrayBuffer || file instanceof Uint8Array ? file : file
+  const { data, error } = await supabase.storage
+    .from(bucket)
+    .upload(filePath, uploadPayload, {
+      cacheControl: '3600',
+      upsert: true,
+    })
+
+  if (error) {
+    throw new Error(`Storage upload failed: ${error.message}`)
+  }
+
+  return getPublicUrlFromStorage(filePath, bucket)
+}
+
+export function getPublicUrlFromStorage(filePath: string, bucket = STORAGE_BUCKET): string {
+  const result = supabase.storage.from(bucket).getPublicUrl(filePath)
+  const publicUrl = result.data?.publicUrl
+  if (!publicUrl) {
+    throw new Error('Failed to build public URL: missing file url')
+  }
+  return publicUrl
+}
+
+export async function removeFileFromStorage(filePath: string, bucket = STORAGE_BUCKET): Promise<void> {
+  const { error } = await supabase.storage.from(bucket).remove([filePath])
+  if (error) {
+    throw new Error(`Failed to remove file from storage: ${error.message}`)
+  }
+}
+
+// Example usage:
+// const publicUrl = await uploadFileToStorage('uploads/event-image.jpg', file)
+// const publicUrl = getPublicUrlFromStorage('uploads/event-image.jpg')
+// await removeFileFromStorage('uploads/event-image.jpg')

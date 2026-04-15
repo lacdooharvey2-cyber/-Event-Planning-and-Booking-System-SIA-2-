@@ -1,15 +1,30 @@
-import { getPool } from '@/lib/db'
+﻿import supabase from '@/lib/supabase'
 
 export interface Payment {
   id: string
   orderId: string
   amount: number
   currency: string
-  paymentMethod: 'credit_card' | 'debit_card' | 'bank_transfer' | 'cash' | 'paypal' | 'gcash' | 'maya' | 'other'
+  paymentMethod:
+    | 'credit_card'
+    | 'debit_card'
+    | 'bank_transfer'
+    | 'cash'
+    | 'paypal'
+    | 'gcash'
+    | 'maya'
+    | 'other'
   paymentGateway?: string
   gatewayTransactionId?: string
   gatewayPaymentId?: string
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'refunded' | 'partially_refunded'
+  status:
+    | 'pending'
+    | 'processing'
+    | 'completed'
+    | 'failed'
+    | 'cancelled'
+    | 'refunded'
+    | 'partially_refunded'
   cardBrand?: string
   cardLast4?: string
   cardCountry?: string
@@ -22,184 +37,129 @@ export interface Payment {
   completedAt?: string
 }
 
-function toMysqlDateTime(iso: string): string {
-  const d = new Date(iso)
-  if (!Number.isNaN(d.getTime())) {
-    return d.toISOString().slice(0, 19).replace('T', ' ')
+function safeString(value: unknown, fallback = ''): string {
+  if (value === null || value === undefined) return fallback
+  return String(value)
+}
+
+function safeNumber(value: unknown): number {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : 0
+}
+
+function mapPaymentRow(row: Record<string, unknown>): Payment {
+  return {
+    id: safeString(row.id),
+    orderId: safeString(row.order_id),
+    amount: safeNumber(row.amount),
+    currency: safeString(row.currency),
+    paymentMethod: safeString(row.payment_method) as Payment['paymentMethod'],
+    paymentGateway: row.payment_gateway ? safeString(row.payment_gateway) : undefined,
+    gatewayTransactionId: row.gateway_transaction_id ? safeString(row.gateway_transaction_id) : undefined,
+    gatewayPaymentId: row.gateway_payment_id ? safeString(row.gateway_payment_id) : undefined,
+    status: safeString(row.status) as Payment['status'],
+    cardBrand: row.card_brand ? safeString(row.card_brand) : undefined,
+    cardLast4: row.card_last4 ? safeString(row.card_last4) : undefined,
+    cardCountry: row.card_country ? safeString(row.card_country) : undefined,
+    failureReason: row.failure_reason ? safeString(row.failure_reason) : undefined,
+    refundedAmount: safeNumber(row.refunded_amount),
+    refundReason: row.refund_reason ? safeString(row.refund_reason) : undefined,
+    metadata: row.metadata ? JSON.parse(String(row.metadata)) : undefined,
+    createdAt: safeString(row.created_at),
+    updatedAt: safeString(row.updated_at),
+    completedAt: row.completed_at ? safeString(row.completed_at) : undefined,
   }
-  return iso.slice(0, 19).replace('T', ' ')
 }
 
-/**
- * Insert a new payment record
- */
 export async function insertPayment(payment: Omit<Payment, 'createdAt' | 'updatedAt'>): Promise<void> {
-  const pool = getPool()
   const now = new Date().toISOString()
-
-  await pool.execute(
-    `INSERT INTO payments (
-      id, order_id, amount, currency, payment_method, payment_gateway,
-      gateway_transaction_id, gateway_payment_id, status, card_brand,
-      card_last4, card_country, failure_reason, refunded_amount,
-      refund_reason, metadata, created_at, updated_at, completed_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      payment.id,
-      payment.orderId,
-      payment.amount,
-      payment.currency,
-      payment.paymentMethod,
-      payment.paymentGateway || null,
-      payment.gatewayTransactionId || null,
-      payment.gatewayPaymentId || null,
-      payment.status,
-      payment.cardBrand || null,
-      payment.cardLast4 || null,
-      payment.cardCountry || null,
-      payment.failureReason || null,
-      payment.refundedAmount,
-      payment.refundReason || null,
-      payment.metadata ? JSON.stringify(payment.metadata) : null,
-      toMysqlDateTime(now),
-      toMysqlDateTime(now),
-      payment.completedAt ? toMysqlDateTime(payment.completedAt) : null,
-    ]
-  )
+  const { error } = await supabase.from('payments').insert([
+    {
+      id: payment.id,
+      order_id: payment.orderId,
+      amount: payment.amount,
+      currency: payment.currency,
+      payment_method: payment.paymentMethod,
+      payment_gateway: payment.paymentGateway ?? null,
+      gateway_transaction_id: payment.gatewayTransactionId ?? null,
+      gateway_payment_id: payment.gatewayPaymentId ?? null,
+      status: payment.status,
+      card_brand: payment.cardBrand ?? null,
+      card_last4: payment.cardLast4 ?? null,
+      card_country: payment.cardCountry ?? null,
+      failure_reason: payment.failureReason ?? null,
+      refunded_amount: payment.refundedAmount,
+      refund_reason: payment.refundReason ?? null,
+      metadata: payment.metadata ? JSON.stringify(payment.metadata) : null,
+      created_at: now,
+      updated_at: now,
+      completed_at: payment.completedAt ?? null,
+    },
+  ])
+  if (error) {
+    throw new Error(`Failed to insert payment: ${error.message}`)
+  }
 }
 
-/**
- * Update payment status
- */
 export async function updatePaymentStatus(
   paymentId: string,
   status: Payment['status'],
   completedAt?: string,
   failureReason?: string
 ): Promise<void> {
-  const pool = getPool()
-  const now = new Date().toISOString()
+  const { error } = await supabase.from('payments').update({
+    status,
+    completed_at: completedAt ?? null,
+    failure_reason: failureReason ?? null,
+    updated_at: new Date().toISOString(),
+  }).eq('id', paymentId)
 
-  await pool.execute(
-    `UPDATE payments SET
-      status = ?,
-      completed_at = ?,
-      failure_reason = ?,
-      updated_at = ?
-     WHERE id = ?`,
-    [
-      status,
-      completedAt ? toMysqlDateTime(completedAt) : null,
-      failureReason || null,
-      toMysqlDateTime(now),
-      paymentId,
-    ]
-  )
-}
-
-/**
- * Get payment by ID
- */
-export async function getPaymentById(paymentId: string): Promise<Payment | null> {
-  const pool = getPool()
-  const [rows] = await pool.execute(
-    'SELECT * FROM payments WHERE id = ?',
-    [paymentId]
-  )
-
-  if (rows.length === 0) return null
-
-  const row = rows[0] as any
-  return {
-    id: row.id,
-    orderId: row.order_id,
-    amount: parseFloat(row.amount),
-    currency: row.currency,
-    paymentMethod: row.payment_method,
-    paymentGateway: row.payment_gateway,
-    gatewayTransactionId: row.gateway_transaction_id,
-    gatewayPaymentId: row.gateway_payment_id,
-    status: row.status,
-    cardBrand: row.card_brand,
-    cardLast4: row.card_last4,
-    cardCountry: row.card_country,
-    failureReason: row.failure_reason,
-    refundedAmount: parseFloat(row.refunded_amount),
-    refundReason: row.refund_reason,
-    metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    completedAt: row.completed_at,
+  if (error) {
+    throw new Error(`Failed to update payment status: ${error.message}`)
   }
 }
 
-/**
- * Get all payments for an order
- */
+export async function getPaymentById(paymentId: string): Promise<Payment | null> {
+  const { data, error } = await supabase.from('payments').select('*').eq('id', paymentId).single()
+  if (error) {
+    if (error.code === 'PGRST116') return null
+    throw new Error(`Failed to fetch payment: ${error.message}`)
+  }
+  return data ? mapPaymentRow(data as Record<string, unknown>) : null
+}
+
 export async function getPaymentsByOrderId(orderId: string): Promise<Payment[]> {
-  const pool = getPool()
-  const [rows] = await pool.execute(
-    'SELECT * FROM payments WHERE order_id = ? ORDER BY created_at DESC',
-    [orderId]
-  )
-
-  return rows.map((row: any) => ({
-    id: row.id,
-    orderId: row.order_id,
-    amount: parseFloat(row.amount),
-    currency: row.currency,
-    paymentMethod: row.payment_method,
-    paymentGateway: row.payment_gateway,
-    gatewayTransactionId: row.gateway_transaction_id,
-    gatewayPaymentId: row.gateway_payment_id,
-    status: row.status,
-    cardBrand: row.card_brand,
-    cardLast4: row.card_last4,
-    cardCountry: row.card_country,
-    failureReason: row.failure_reason,
-    refundedAmount: parseFloat(row.refunded_amount),
-    refundReason: row.refund_reason,
-    metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    completedAt: row.completed_at,
-  }))
+  const { data, error } = await supabase.from('payments').select('*').eq('order_id', orderId).order('created_at', { ascending: false })
+  if (error) {
+    throw new Error(`Failed to fetch payments for order ${orderId}: ${error.message}`)
+  }
+  return (data ?? []).map((row) => mapPaymentRow(row as Record<string, unknown>))
 }
 
-/**
- * Process refund
- */
-export async function processRefund(
-  paymentId: string,
-  refundAmount: number,
-  refundReason?: string
-): Promise<void> {
-  const pool = getPool()
-  const now = new Date().toISOString()
+export async function processRefund(paymentId: string, refundAmount: number, refundReason?: string): Promise<void> {
+  const { data, error } = await supabase.from('payments').select('amount, refunded_amount').eq('id', paymentId).single()
+  if (error) {
+    throw new Error(`Failed to load payment for refund: ${error.message}`)
+  }
 
-  await pool.execute(
-    `UPDATE payments SET
-      refunded_amount = refunded_amount + ?,
-      refund_reason = ?,
-      status = CASE
-        WHEN refunded_amount + ? >= amount THEN 'refunded'
-        ELSE 'partially_refunded'
-      END,
-      updated_at = ?
-     WHERE id = ?`,
-    [
-      refundAmount,
-      refundReason || null,
-      refundAmount,
-      toMysqlDateTime(now),
-      paymentId,
-    ]
-  )
+  const payment = data as Record<string, unknown>
+  const amount = safeNumber(payment.amount)
+  const currentRefunded = safeNumber(payment.refunded_amount)
+  const totalRefunded = currentRefunded + refundAmount
+  const status = totalRefunded >= amount ? 'refunded' : 'partially_refunded'
+
+  const update = await supabase.from('payments').update({
+    refunded_amount: totalRefunded,
+    refund_reason: refundReason ?? null,
+    status,
+    updated_at: new Date().toISOString(),
+  }).eq('id', paymentId)
+
+  if (update.error) {
+    throw new Error(`Failed to process refund: ${update.error.message}`)
+  }
 }
 
-/**
- * Get payment statistics
- */
 export async function getPaymentStats(): Promise<{
   totalPayments: number
   totalAmount: number
@@ -207,23 +167,48 @@ export async function getPaymentStats(): Promise<{
   failedPayments: number
   refundedAmount: number
 }> {
-  const pool = getPool()
-  const [rows] = await pool.execute(`
-    SELECT
-      COUNT(*) as total_payments,
-      SUM(amount) as total_amount,
-      SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_payments,
-      SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_payments,
-      SUM(refunded_amount) as refunded_amount
-    FROM payments
-  `)
+  const { data, error } = await supabase.rpc('payment_stats')
 
-  const row = rows[0] as any
+  if (error) {
+    const summary = await supabase.from('payments').select('id', { count: 'estimated' }).single()
+    if (summary.error) {
+      throw new Error(`Failed to fetch payment stats: ${summary.error.message}`)
+    }
+    return {
+      totalPayments: summary.count ?? 0,
+      totalAmount: 0,
+      completedPayments: 0,
+      failedPayments: 0,
+      refundedAmount: 0,
+    }
+  }
+
+  const row = data as Record<string, unknown>
   return {
-    totalPayments: parseInt(row.total_payments) || 0,
-    totalAmount: parseFloat(row.total_amount) || 0,
-    completedPayments: parseInt(row.completed_payments) || 0,
-    failedPayments: parseInt(row.failed_payments) || 0,
-    refundedAmount: parseFloat(row.refunded_amount) || 0,
+    totalPayments: safeNumber(row.total_payments),
+    totalAmount: safeNumber(row.total_amount),
+    completedPayments: safeNumber(row.completed_payments),
+    failedPayments: safeNumber(row.failed_payments),
+    refundedAmount: safeNumber(row.refunded_amount),
   }
 }
+
+export async function updateOrderPaymentStatus(orderId: string, paymentMethod: string, paymentStatus: string): Promise<void> {
+  const { error } = await supabase.from('orders').update({
+    payment_method: paymentMethod,
+    payment_status: paymentStatus,
+    updated_at: new Date().toISOString(),
+  }).eq('id', orderId)
+
+  if (error) {
+    throw new Error(`Failed to update order payment status: ${error.message}`)
+  }
+}
+
+// Example usage:
+// await insertPayment(payment)
+// await updatePaymentStatus('payment-123', 'completed', new Date().toISOString())
+// const payment = await getPaymentById('payment-123')
+// const payments = await getPaymentsByOrderId('order-456')
+// await processRefund('payment-123', 100, 'Partial refund')
+// await updateOrderPaymentStatus('order-456', 'credit_card', 'completed')

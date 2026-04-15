@@ -1,3 +1,6 @@
+import { fetchCategories, fetchMenuItems } from '@/lib/catalog-db'
+import { fetchOrdersWithItems } from '@/lib/orders-db'
+
 export interface Venue {
   id: string
   name: string
@@ -329,3 +332,75 @@ export const categories = ['All', 'Function Room', 'Garden', 'Beach', 'Rooftop',
 export const venueThemes = ['All Themes', 'Wedding', 'Kiddie Party', 'Debut', 'Birthday', 'Corporate', 'Christening', 'Reunion']
 export const locations = ['All Locations', 'Metro Manila', 'Quezon City', 'Makati', 'Cavite', 'Manila', 'Tagaytay']
 export const serviceCategories = ['Photography', 'Videography', 'Entertainment', 'Catering', 'Decoration', 'Planning']
+
+export interface Category {
+  id: string
+  name: string
+  description?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export interface MenuItem {
+  id: string
+  categoryId: string | null
+  name: string
+  description?: string | null
+  price: number
+  imageUrl?: string | null
+  categoryName?: string | null
+  createdAt?: string | null
+  updatedAt?: string | null
+}
+
+export interface OrderSummary {
+  id: string
+  user_id: string
+  total_amount: number
+  status: string
+  event_date: string
+  guest_count: number
+  location: string
+  customer_name: string
+  customer_email: string
+  customer_phone: string
+  payment_method?: string | null
+  payment_status?: string | null
+  card_last4?: string | null
+  transaction_id?: string | null
+  paid_at?: string | null
+  created_at: string
+  updated_at: string
+  items: {
+    id: string
+    order_id: string
+    item_type: 'venue' | 'service'
+    catalog_id: string
+    name: string
+    price: number
+    quantity: number
+    event_item_date?: string | null
+  }[]
+}
+
+export async function fetchCatalog(): Promise<{ categories: Category[]; menuItems: MenuItem[] }> {
+  const [categories, menuItems] = await Promise.all([fetchCategories(), fetchMenuItems()])
+  return { categories, menuItems }
+}
+
+export async function fetchOrdersSummary(userId?: string): Promise<OrderSummary[]> {
+  return fetchOrdersWithItems(userId)
+}
+
+export async function fetchCatalogAndOrders(userId?: string): Promise<{
+  categories: Category[]
+  menuItems: MenuItem[]
+  orders: OrderSummary[]
+}> {
+  const [catalog, orders] = await Promise.all([fetchCatalog(), fetchOrdersSummary(userId)])
+  return {
+    categories: catalog.categories,
+    menuItems: catalog.menuItems,
+    orders,
+  }
+}

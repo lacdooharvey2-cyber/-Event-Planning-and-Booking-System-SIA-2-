@@ -1,4 +1,4 @@
-﻿import supabase from '@/lib/supabase'
+﻿import getSupabase from '@/lib/supabase'
 
 export interface Payment {
   id: string
@@ -73,7 +73,7 @@ function mapPaymentRow(row: Record<string, unknown>): Payment {
 
 export async function insertPayment(payment: Omit<Payment, 'createdAt' | 'updatedAt'>): Promise<void> {
   const now = new Date().toISOString()
-  const { error } = await supabase.from('payments').insert([
+  const { error } = await getSupabase().from('payments').insert([
     {
       id: payment.id,
       order_id: payment.orderId,
@@ -107,7 +107,7 @@ export async function updatePaymentStatus(
   completedAt?: string,
   failureReason?: string
 ): Promise<void> {
-  const { error } = await supabase.from('payments').update({
+  const { error } = await getSupabase().from('payments').update({
     status,
     completed_at: completedAt ?? null,
     failure_reason: failureReason ?? null,
@@ -120,7 +120,7 @@ export async function updatePaymentStatus(
 }
 
 export async function getPaymentById(paymentId: string): Promise<Payment | null> {
-  const { data, error } = await supabase.from('payments').select('*').eq('id', paymentId).single()
+  const { data, error } = await getSupabase().from('payments').select('*').eq('id', paymentId).single()
   if (error) {
     if (error.code === 'PGRST116') return null
     throw new Error(`Failed to fetch payment: ${error.message}`)
@@ -129,7 +129,7 @@ export async function getPaymentById(paymentId: string): Promise<Payment | null>
 }
 
 export async function getPaymentsByOrderId(orderId: string): Promise<Payment[]> {
-  const { data, error } = await supabase.from('payments').select('*').eq('order_id', orderId).order('created_at', { ascending: false })
+  const { data, error } = await getSupabase().from('payments').select('*').eq('order_id', orderId).order('created_at', { ascending: false })
   if (error) {
     throw new Error(`Failed to fetch payments for order ${orderId}: ${error.message}`)
   }
@@ -137,7 +137,7 @@ export async function getPaymentsByOrderId(orderId: string): Promise<Payment[]> 
 }
 
 export async function processRefund(paymentId: string, refundAmount: number, refundReason?: string): Promise<void> {
-  const { data, error } = await supabase.from('payments').select('amount, refunded_amount').eq('id', paymentId).single()
+  const { data, error } = await getSupabase().from('payments').select('amount, refunded_amount').eq('id', paymentId).single()
   if (error) {
     throw new Error(`Failed to load payment for refund: ${error.message}`)
   }
@@ -148,7 +148,7 @@ export async function processRefund(paymentId: string, refundAmount: number, ref
   const totalRefunded = currentRefunded + refundAmount
   const status = totalRefunded >= amount ? 'refunded' : 'partially_refunded'
 
-  const update = await supabase.from('payments').update({
+  const update = await getSupabase().from('payments').update({
     refunded_amount: totalRefunded,
     refund_reason: refundReason ?? null,
     status,
@@ -167,10 +167,10 @@ export async function getPaymentStats(): Promise<{
   failedPayments: number
   refundedAmount: number
 }> {
-  const { data, error } = await supabase.rpc('payment_stats')
+  const { data, error } = await getSupabase().rpc('payment_stats')
 
   if (error) {
-    const summary = await supabase.from('payments').select('id', { count: 'estimated' }).single()
+    const summary = await getSupabase().from('payments').select('id', { count: 'estimated' }).single()
     if (summary.error) {
       throw new Error(`Failed to fetch payment stats: ${summary.error.message}`)
     }
@@ -194,7 +194,7 @@ export async function getPaymentStats(): Promise<{
 }
 
 export async function updateOrderPaymentStatus(orderId: string, paymentMethod: string, paymentStatus: string): Promise<void> {
-  const { error } = await supabase.from('orders').update({
+  const { error } = await getSupabase().from('orders').update({
     payment_method: paymentMethod,
     payment_status: paymentStatus,
     updated_at: new Date().toISOString(),

@@ -1,6 +1,6 @@
 'use client'
 
-import supabase from '@/lib/supabase'
+import getSupabase from '@/lib/supabase'
 
 export interface User {
   id: string
@@ -417,7 +417,7 @@ export async function uploadFileToStorage(
   bucket = STORAGE_BUCKET
 ): Promise<string> {
   const uploadPayload = file instanceof ArrayBuffer || file instanceof Uint8Array ? file : file
-  const { data, error } = await supabase.storage
+  const { data, error } = await getSupabase().storage
     .from(bucket)
     .upload(filePath, uploadPayload, {
       cacheControl: '3600',
@@ -432,7 +432,7 @@ export async function uploadFileToStorage(
 }
 
 export function getPublicUrlFromStorage(filePath: string, bucket = STORAGE_BUCKET): string {
-  const result = supabase.storage.from(bucket).getPublicUrl(filePath)
+  const result = getSupabase().storage.from(bucket).getPublicUrl(filePath)
   const publicUrl = result.data?.publicUrl
   if (!publicUrl) {
     throw new Error('Failed to build public URL: missing file url')
@@ -441,7 +441,7 @@ export function getPublicUrlFromStorage(filePath: string, bucket = STORAGE_BUCKE
 }
 
 export async function removeFileFromStorage(filePath: string, bucket = STORAGE_BUCKET): Promise<void> {
-  const { error } = await supabase.storage.from(bucket).remove([filePath])
+  const { error } = await getSupabase().storage.from(bucket).remove([filePath])
   if (error) {
     throw new Error(`Failed to remove file from storage: ${error.message}`)
   }

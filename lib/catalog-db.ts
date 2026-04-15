@@ -1,4 +1,4 @@
-import supabase from '@/lib/supabase'
+import getSupabase from '@/lib/supabase'
 import type { Service, Venue } from '@/lib/data'
 import { services as staticServices, venues as staticVenues } from '@/lib/data'
 
@@ -127,7 +127,7 @@ function mapServiceRowFromSupabase(row: SupabaseRow): Service {
 }
 
 export async function fetchCategories(): Promise<Category[]> {
-  const { data, error } = await supabase.from('categories').select('*').order('name')
+  const { data, error } = await getSupabase().from('categories').select('*').order('name')
   if (error) {
     throw new Error(`Failed to fetch categories: ${error.message}`)
   }
@@ -135,7 +135,7 @@ export async function fetchCategories(): Promise<Category[]> {
 }
 
 export async function fetchMenuItems(): Promise<MenuItem[]> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('menu_items')
     .select('*, category:category_id(name)')
     .order('name')
@@ -168,7 +168,7 @@ export async function fetchCategoriesWithItems(): Promise<CategoryWithItems[]> {
 
 export async function fetchVenuesFromDb(): Promise<Venue[]> {
   try {
-    const { data, error } = await supabase.from('venues').select('*').order('id')
+    const { data, error } = await getSupabase().from('venues').select('*').order('id')
     if (error) throw error
     return (data ?? []).map(mapVenueRowFromSupabase)
   } catch (error) {
@@ -179,7 +179,7 @@ export async function fetchVenuesFromDb(): Promise<Venue[]> {
 
 export async function fetchVenueByIdFromDb(id: string): Promise<Venue | null> {
   try {
-    const { data, error } = await supabase.from('venues').select('*').eq('id', id).single()
+    const { data, error } = await getSupabase().from('venues').select('*').eq('id', id).single()
     if (error) {
       if (error.code === 'PGRST116') {
         return null
@@ -195,7 +195,7 @@ export async function fetchVenueByIdFromDb(id: string): Promise<Venue | null> {
 
 export async function fetchServicesFromDb(): Promise<Service[]> {
   try {
-    const { data, error } = await supabase.from('services').select('*').order('id')
+    const { data, error } = await getSupabase().from('services').select('*').order('id')
     if (error) throw error
     return (data ?? []).map(mapServiceRowFromSupabase)
   } catch (error) {

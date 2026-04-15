@@ -1,4 +1,4 @@
-import supabase from '@/lib/supabase'
+import getSupabase from '@/lib/supabase'
 
 interface OrderItemInput {
   id: string
@@ -131,7 +131,7 @@ export async function insertBookingToDb(booking: {
     updated_at: booking.updatedAt,
   }
 
-  const { data: orderData, error: orderError } = await supabase.from('orders').insert(orderPayload).select().single()
+  const { data: orderData, error: orderError } = await getSupabase().from('orders').insert(orderPayload).select().single()
   if (orderError || !orderData) {
     throw new Error(orderError?.message ?? 'Failed to insert order')
   }
@@ -147,7 +147,7 @@ export async function insertBookingToDb(booking: {
   }))
 
   if (itemsPayload.length > 0) {
-    const { error: itemsError } = await supabase.from('order_items').insert(itemsPayload)
+    const { error: itemsError } = await getSupabase().from('order_items').insert(itemsPayload)
     if (itemsError) {
       throw new Error(itemsError.message)
     }
@@ -155,7 +155,7 @@ export async function insertBookingToDb(booking: {
 }
 
 export async function fetchOrderById(orderId: string): Promise<OrderWithItems | null> {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from('orders')
     .select('*, order_items(*)')
     .eq('id', orderId)
@@ -178,7 +178,7 @@ export async function fetchOrderById(orderId: string): Promise<OrderWithItems | 
 }
 
 export async function fetchOrdersWithItems(userId?: string): Promise<OrderWithItems[]> {
-  let query = supabase.from('orders').select('*, order_items(*)').order('created_at', { ascending: false })
+  let query = getSupabase().from('orders').select('*, order_items(*)').order('created_at', { ascending: false })
   if (userId) {
     query = query.eq('user_id', userId)
   }
